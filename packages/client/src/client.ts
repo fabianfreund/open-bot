@@ -1,0 +1,130 @@
+import type {
+  AgentDefinition,
+  AgentView,
+  Conversation,
+  CreateAgentRequest,
+  HealthResponse,
+  Message,
+  ProjectInfo,
+  ProviderHealth,
+  ProviderInfo,
+  SkillInfo,
+  UpdateAgentRequest,
+} from '@openbot/shared';
+import { EventStream, type EventStreamHandlers } from './stream.js';
+
+export interface OpenBotClientOptions {
+  /** e.g. `http://100.x.y.z:7788` */
+  baseUrl: string;
+  token: string;
+}
+
+/**
+ * The only way the UI talks to a project, local or across a tailnet. Uses
+ * nothing but `fetch` and `WebSocket`, so it works in Electron, a browser, and
+ * eventually a mobile app.
+ */
+export class OpenBotClient {
+  readonly baseUrl: string;
+  readonly token: string;
+
+  constructor(options: OpenBotClientOptions) {
+    this.baseUrl = options.baseUrl.replace(/\/$/, '');
+    this.token = options.token;
+  }
+
+  health(): Promise<HealthResponse> {
+    return this.#get('/api/health');
+  }
+  project(): Promise<ProjectInfo> {
+    return this.#get('/api/project');
+  }
+  agents(): Promise<AgentView[]> {
+    return this.#get('/api/agents');
+  }
+  skills(): Promise<SkillInfo[]> {
+    return this.#get('/api/skills');
+  }
+  providers(): Promise<{ providers: ProviderInfo[]; health: ProviderHealth[] }> {
+    return this.#get('/api/providers');
+  }
+
+  createAgent(request: CreateAgentRequest): Promise<{ agent: AgentDefinition; conversationId: string }> {
+    return this.#send('POST', '/api/agents', request);
+  }
+  updateAgent(id: string, patch: UpdateAgentRequest): Promise<AgentDefinition> {
+    return this.#send('PATCH', `/api/agents/${id}`, patch);
+  }
+
+  conversationFor(agentId: string): Promise<Conversation> {
+    return this.#get(`/api/agents/${agentId}/conversation`);
+  }
+  messages(conversationId: string): Promise<Message[]> {
+    return this.#get(`/api/conversations/${conversationId}/messages`);
+  }
+  send(conversationId: string, text: string, images: string[] = []): Promise<Message> {
+    return this.#send('POST', `/api/conversations/${conversationId}/messages`, { text, images });
+  }
+  /** Answers an inline card; the reply continues the conversation. */
+  answerCard(conversationId: string, messageId: string, cardId: string, answer: string): Promise<void> {
+    return this.#send('POST', `/api/conversations/${conversationId}/answer`, {
+      messageId,
+      cardId,
+      answer,
+    });
+  }
+  abort(conversationId: string): Promise<{ stopped: boolean }> {
+    return this.#send('POST', `/api/conversations/${conversationId}/abort`, {});
+  }
+
+  /** Opens the live event stream. Returns a handle you can `close()`. */
+  stream(handlers: EventStreamHandlers): EventStream {
+    const url = `${this.baseUrl.replace(/^http/, 'ws')}/ws?token=${encodeURIComponent(this.token)}`;
+    return new EventStream(url, handlers);
+  }
+
+  async #get<T>(path: string): Promise<T> {
+    return this.#request<T>('GET', path);
+  }
+
+  async #send<T>(method: string, path: string, body: unknown): Promise<T> {
+    return this.#request<T>(method, path, body);
+  }
+
+  async #request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method,
+      headers: {
+        authorization: `Bearer ${this.token}`,
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new OpenBotHttpError(res.status, describe(res.status), detail);
+    }
+    if (res.status === 204) return undefined as T;
+    return (await res.json()) as T;
+  }
+}
+
+/** Messages a person can act on. The status code stays on the error object. */
+function describe(status: number): string {
+  if (status === 401) return 'This app is no longer paired with that team.';
+  if (status === 404) return 'That is not there any more.';
+  if (status === 409) return 'That is no longer available.';
+  if (status >= 500) return 'The team\u2019s computer had a problem.';
+  return 'That did not work.';
+}
+
+export class OpenBotHttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+    readonly detail: string,
+  ) {
+    super(message);
+    this.name = 'OpenBotHttpError';
+  }
+}

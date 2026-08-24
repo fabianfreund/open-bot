@@ -1,0 +1,14 @@
+{
+  "name": "@openbot/skills-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": { "openbot-skills-mcp": "./dist/index.js" },
+  "scripts": { "build": "tsc --build", "clean": "rm -rf dist *.tsbuildinfo" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@openbot/shared": "workspace:*"
+  },
+  "devDependencies": { "@types/node": "^26.2.0" }
+}

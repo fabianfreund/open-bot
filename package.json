@@ -1,0 +1,25 @@
+{
+  "name": "openbot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted agent team you chat with. Electron app + local server.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=20.11" },
+  "packageManager": "pnpm@9.15.2",
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/**\" run build",
+    "build:all": "pnpm run build && pnpm --filter @openbot/desktop run build",
+    "dev": "pnpm run build && pnpm --filter @openbot/desktop run dev",
+    "dev:packages": "tsc --build --watch packages/shared packages/core packages/client packages/server packages/skills-mcp",
+    "serve": "pnpm run build && node packages/server/dist/bin.js",
+    "typecheck": "tsc --build packages/shared packages/core packages/client packages/server packages/skills-mcp && pnpm --filter @openbot/desktop run typecheck",
+    "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo apps/desktop/out node_modules/.tmp",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.9.3"
+  }
+}

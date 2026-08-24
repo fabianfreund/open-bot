@@ -1,0 +1,22 @@
+{
+  "name": "@openbot/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "bin": { "openbot-server": "./dist/bin.js" },
+  "scripts": {
+    "build": "tsc --build",
+    "start": "node dist/bin.js",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@fastify/websocket": "^11.3.0",
+    "@openbot/core": "workspace:*",
+    "@openbot/shared": "workspace:*",
+    "fastify": "^5.12.1"
+  },
+  "devDependencies": { "@types/node": "^26.2.0" }
+}

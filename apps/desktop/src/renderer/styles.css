@@ -1,0 +1,48 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-surface: #0b0b0d;
+  --color-panel: #transparent;
+  --color-sidebar: #131316;
+  --color-raised: #1c1c20;
+  --color-line: #26262b;
+  --color-ink: #ececee;
+  --color-muted: #8a8a93;
+  --color-accent: #4f8ef7;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The whole title bar is draggable except where controls live. */
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2c2c32;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
