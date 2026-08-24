@@ -11,6 +11,17 @@
   --color-accent: #4f8ef7;
 }
 
+:root[data-theme='light'] {
+  --color-surface: #f8f8f9;
+  --color-panel: transparent;
+  --color-sidebar: #ffffff;
+  --color-raised: #eeeeef;
+  --color-line: #e5e5e8;
+  --color-ink: #1a1a1d;
+  --color-muted: #74747c;
+  --color-accent: #3568e0;
+}
+
 html,
 body,
 #root {
@@ -24,6 +35,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 /* The whole title bar is draggable except where controls live. */
@@ -45,4 +57,7 @@ body {
 }
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+:root[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: #d7d7db;
 }
