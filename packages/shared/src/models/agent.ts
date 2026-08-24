@@ -21,7 +21,9 @@ export type AgentAvatar = z.infer<typeof AgentAvatarSchema>;
 export const AgentWorkspaceSchema = z.object({
   shared: z.array(z.string()).default([]),
   /** Codex sandbox level for this agent's turns. */
-  sandbox: z.enum(['read-only', 'workspace-write', 'danger-full-access']).default('workspace-write'),
+  sandbox: z
+    .enum(['read-only', 'workspace-write', 'danger-full-access'])
+    .default('workspace-write'),
 });
 export type AgentWorkspace = z.infer<typeof AgentWorkspaceSchema>;
 
@@ -50,15 +52,11 @@ export const AgentDefinitionSchema = z.object({
 });
 export type AgentDefinition = z.infer<typeof AgentDefinitionSchema>;
 
-export const AgentDraftSchema = AgentDefinitionSchema.partial({
-  id: true,
-  slug: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({ name: z.string().min(1) });
-export type AgentDraft = z.input<typeof AgentDraftSchema>;
-
-export type AgentStatus = 'idle' | 'thinking' | 'working' | 'waiting-on-user' | 'error';
+/**
+ * `offline` means the bot is not holding this chat in mind: it has never been
+ * spoken to, or its context was cleared. Messaging it brings it back.
+ */
+export type AgentStatus = 'offline' | 'idle' | 'thinking' | 'working' | 'waiting-on-user' | 'error';
 
 /** Runtime view of an agent: its definition plus live state the UI needs. */
 export interface AgentView {

@@ -9,3 +9,4 @@ export * from './models/provider.js';
 export * from './events.js';
 export * from './protocol.js';
 export * from './constants.js';
+export * from './http.js';

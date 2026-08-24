@@ -30,6 +30,8 @@ interface State {
   reset(): Promise<void>;
   leave(): Promise<void>;
   selectAgent(agentId: string): Promise<void>;
+  /** Clears the unread badge for whichever chat is open. */
+  markRead(): Promise<void>;
   sendMessage(text: string): Promise<void>;
   stop(): Promise<void>;
   answerCard(message: Message, card: Card, answer: string): Promise<void>;
@@ -128,6 +130,18 @@ export const useStore = create<State>((set, get) => ({
     // Guard against a slower fetch landing after the user moved on.
     if (get().activeAgentId !== agentId) return;
     set({ conversationId: conversation.id, messages });
+    await get().markRead();
+  },
+
+  async markRead() {
+    const { client, conversationId, agents, activeAgentId } = get();
+    const active = agents.find((a) => a.definition.id === activeAgentId);
+    if (!client || !conversationId || !active?.unread) return;
+    try {
+      await client.markRead(conversationId);
+    } catch {
+      // Nothing to recover: the badge clears on the next look.
+    }
   },
 
   async sendMessage(text) {
@@ -215,12 +229,17 @@ function applyEvent(event: ServerEvent, set: Setter, get: Getter): void {
           a.definition.id === event.conversation.agentId
             ? {
                 ...a,
+                unread: event.conversation.unread,
                 lastMessageAt: event.conversation.lastMessageAt,
                 lastMessagePreview: event.conversation.lastMessagePreview,
               }
             : a,
         ),
       }));
+      // Reading it while looking at it is the same as having read it.
+      if (event.conversation.id === get().conversationId && document.hasFocus()) {
+        void get().markRead();
+      }
       break;
     case 'message.created': {
       if (event.message.conversationId !== get().conversationId) break;

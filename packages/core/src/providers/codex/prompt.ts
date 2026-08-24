@@ -19,11 +19,18 @@ export function buildBrief(agent: AgentDefinition): string {
 
 /**
  * Codex keeps thread history itself, so a recap is only needed when a
- * conversation starts a fresh thread over an existing chat log.
+ * conversation starts a fresh thread over an existing chat log. It says what
+ * it left out, because a bot that knows it is missing something can go and
+ * find it rather than guessing.
  */
 export function buildRecap(history: Message[]): string {
   if (history.length === 0) return '';
   const recent = history.slice(-RECAP_LIMIT);
+  const dropped = history.length - recent.length;
   const lines = recent.map((m) => `${m.author.name}: ${m.body.replace(/\s+/g, ' ').slice(0, 400)}`);
-  return ['Earlier in this chat:', ...lines].join('\n');
+  const header =
+    dropped > 0
+      ? `The last ${recent.length} of ${history.length} messages in this chat. ${dropped} earlier ones are not here; look_back searches them.`
+      : 'Earlier in this chat:';
+  return [header, ...lines].join('\n');
 }

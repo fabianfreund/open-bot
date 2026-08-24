@@ -13,6 +13,7 @@ import {
   type Message,
   type ProjectInfo,
   type SendMessageRequest,
+  type SkillInfo,
   type SkillResult,
   type UpdateAgentRequest,
 } from '@openbot/shared';
@@ -27,11 +28,14 @@ import { CodexProvider } from './providers/codex/codex-provider.js';
 import { EchoProvider } from './providers/echo/echo-provider.js';
 import { SkillRegistry } from './skills/registry.js';
 import { builtinSkills } from './skills/builtin/index.js';
-import type { SkillHost } from './skills/skill.js';
+import type { HistoryHit, SkillHost } from './skills/skill.js';
 import { TurnRunner } from './turn-runner.js';
 
 /** A bot asking a bot asking a bot… stops here. */
 const MAX_DELEGATION_DEPTH = 3;
+
+/** How often quiet chats are checked for having gone cold. */
+const SWEEP_MS = 60_000;
 
 export interface RuntimeOptions {
   root: string;
@@ -63,6 +67,7 @@ export class OpenBotRuntime implements SkillHost {
   #serverUrl = '';
   #token = '';
   #bridgePath: string;
+  #sweeper?: ReturnType<typeof setInterval>;
 
   private constructor(
     readonly project: ProjectStore,
@@ -91,7 +96,16 @@ export class OpenBotRuntime implements SkillHost {
     runtime.providers.register(new EchoProvider());
     runtime.skills.registerAll(builtinSkills);
     runtime.#token = await project.token();
+    await runtime.#endQuietSessions();
+    runtime.#sweeper = setInterval(() => void runtime.#endQuietSessions(), SWEEP_MS);
+    runtime.#sweeper.unref?.();
     return runtime;
+  }
+
+  /** Stops the background work. The project on disk is already up to date. */
+  close(): void {
+    if (this.#sweeper) clearInterval(this.#sweeper);
+    this.#sweeper = undefined;
   }
 
   // --- identity -----------------------------------------------------------
@@ -129,14 +143,67 @@ export class OpenBotRuntime implements SkillHost {
   }
 
   async updateAgent(id: string, patch: UpdateAgentRequest): Promise<AgentDefinition> {
+    const before = this.agents.get(id);
     const definition = await this.agents.update(id, patch);
+    // A provider thread carries the old brief with it, so a rebriefed bot has
+    // to start fresh. Its chats are recapped into the new thread.
+    if (
+      before &&
+      (before.instructions !== definition.instructions || before.name !== definition.name)
+    ) {
+      await this.#forgetThreads(id);
+    }
     if (definition.archived) this.bus.emit({ type: 'agent.removed', agentId: id });
     else this.bus.emit({ type: 'agent.updated', agent: this.#view(definition) });
     return definition;
   }
 
-  listAgents(): AgentDefinition[] {
-    return this.agents.list();
+  listSkills(): SkillInfo[] {
+    return this.skills.list();
+  }
+
+  /**
+   * Looks through every chat an agent has been part of, newest first. History
+   * outlives any provider thread, so this is what a bot uses when it needs
+   * something older than the recap it was given.
+   */
+  async searchHistory(options: {
+    agentId: string;
+    query?: string;
+    since?: string;
+    until?: string;
+    limit: number;
+  }): Promise<HistoryHit[]> {
+    const needle = options.query?.trim().toLowerCase() ?? '';
+    const from = options.since ? Date.parse(options.since) : undefined;
+    // An end date means the whole of that day, not midnight at the start of it.
+    const to = options.until ? Date.parse(options.until) + DAY_MS : undefined;
+    const hits: HistoryHit[] = [];
+
+    for (const conversation of this.conversations.list()) {
+      if (!conversation.participants.includes(options.agentId)) continue;
+      const where = this.#describeConversation(conversation, options.agentId);
+      for (const message of await this.conversations.messages(conversation.id)) {
+        if (!message.body.trim()) continue;
+        const at = Date.parse(message.createdAt);
+        if (from !== undefined && at < from) continue;
+        if (to !== undefined && at >= to) continue;
+        const index = needle ? message.body.toLowerCase().indexOf(needle) : 0;
+        if (index === -1) continue;
+        hits.push({
+          where,
+          author: message.author.name,
+          at: message.createdAt,
+          excerpt: needle ? excerpt(message.body, index) : summarise(message.body),
+        });
+      }
+    }
+
+    return hits.sort((a, b) => b.at.localeCompare(a.at)).slice(0, options.limit);
+  }
+
+  listAgents(options?: { includeRetired?: boolean }): AgentDefinition[] {
+    return options?.includeRetired ? this.agents.listAll() : this.agents.list();
   }
 
   getAgent(idOrName: string): AgentDefinition | undefined {
@@ -187,6 +254,12 @@ export class OpenBotRuntime implements SkillHost {
     );
 
     return message;
+  }
+
+  /** The person opened this chat, so nothing in it is unread any more. */
+  async markRead(conversationId: string): Promise<void> {
+    const conversation = await this.conversations.markRead(conversationId);
+    if (conversation) this.bus.emit({ type: 'conversation.updated', conversation });
   }
 
   /** Stops whatever the agent in this conversation is doing. */
@@ -272,12 +345,13 @@ export class OpenBotRuntime implements SkillHost {
         input: { text: options.text, images: [] },
         depth,
       });
-      await this.#relay(outcome, to, options.originConversationId);
       return outcome.message.body;
     });
 
     if (!options.wait) {
-      work.catch((err) => this.log.warn('delegated turn failed', err));
+      work
+        .then((body) => this.#deliverReply(to, from, options.originConversationId, body, depth))
+        .catch((err) => this.log.warn('delegated turn failed', err));
       return null;
     }
     return (await work) as string;
@@ -296,6 +370,8 @@ export class OpenBotRuntime implements SkillHost {
       streaming: false,
     });
     this.bus.emit({ type: 'message.created', message });
+    const counted = await this.conversations.markUnread(conversation.id);
+    if (counted) this.bus.emit({ type: 'conversation.updated', conversation: counted });
     this.#setStatus(agent.id, 'waiting-on-user');
   }
 
@@ -313,27 +389,83 @@ export class OpenBotRuntime implements SkillHost {
 
   // --- internals ----------------------------------------------------------
 
+  /** How a chat reads to the agent doing the looking. */
+  #describeConversation(conversation: Conversation, agentId: string): string {
+    if (conversation.kind === 'dm') return 'in your chat';
+    const other = conversation.participants.find((id) => id !== agentId && id !== USER_ID);
+    const name = other ? this.agents.get(other)?.name : undefined;
+    return name ? `with ${name}` : 'with a colleague';
+  }
+
   /**
-   * Copies a colleague's answer back into the chat that asked for it, so the
-   * user sees "Message from Research" without opening another conversation.
+   * Ends the session in any chat that has gone quiet: the provider thread is
+   * dropped, so nothing carries context nobody is using, and the bot shows as
+   * offline. Every message is still on disk, and the next one starts a new
+   * session with a recap.
    */
-  async #relay(
-    outcome: { message: Message },
+  async #endQuietSessions(): Promise<void> {
+    const cutoff = Date.now() - this.project.file.settings.sessionMinutes * 60_000;
+    const working = new Set(
+      [...this.#turns.keys()].map((id) => this.conversations.get(id)?.agentId),
+    );
+
+    for (const conversation of this.conversations.list()) {
+      if (Object.keys(conversation.providerThreads).length === 0) continue;
+      if (this.#turns.has(conversation.id)) continue;
+      const last = Date.parse(conversation.lastMessageAt ?? conversation.createdAt);
+      if (Number.isNaN(last) || last > cutoff) continue;
+
+      const updated = await this.conversations.patch(conversation.id, { providerThreads: {} });
+      this.bus.emit({ type: 'conversation.updated', conversation: updated });
+      for (const id of conversation.participants) {
+        const agent = this.agents.get(id);
+        if (!agent) continue;
+        // A bot that is busy elsewhere keeps whatever it is doing.
+        if (!working.has(id)) this.#status.delete(id);
+        this.bus.emit({ type: 'agent.updated', agent: this.#view(agent) });
+      }
+    }
+  }
+
+  /** Drops one agent's provider threads so its next turn starts clean. */
+  async #forgetThreads(agentId: string): Promise<void> {
+    for (const conversation of this.conversations.list()) {
+      if (!(agentId in conversation.providerThreads)) continue;
+      const { [agentId]: _gone, ...rest } = conversation.providerThreads;
+      const updated = await this.conversations.patch(conversation.id, { providerThreads: rest });
+      this.bus.emit({ type: 'conversation.updated', conversation: updated });
+    }
+  }
+
+  /**
+   * Hands a colleague's answer back to the bot that asked for it, in the chat
+   * it asked from. Only that bot speaks there, so a chat with one bot never
+   * fills up with messages from bots the person did not open.
+   */
+  async #deliverReply(
     from: AgentDefinition,
+    to: AgentDefinition,
     originConversationId: string,
+    body: string,
+    depth: number,
   ): Promise<void> {
-    if (originConversationId === outcome.message.conversationId) return;
-    if (!outcome.message.body.trim()) return;
-    const relayed = await this.conversations.append({
-      conversationId: originConversationId,
-      author: { kind: 'agent', id: from.id, name: from.name },
-      body: outcome.message.body,
-      parts: [],
-      cards: [],
-      streaming: false,
-      relayedFrom: from.name,
-    });
-    this.bus.emit({ type: 'message.created', message: relayed });
+    const answer = body.trim();
+    if (!answer) return;
+    const origin = this.conversations.get(originConversationId);
+    if (!origin || !origin.participants.includes(to.id)) return;
+
+    await this.#enqueue(originConversationId, () =>
+      this.#runTurn({
+        conversationId: originConversationId,
+        agentId: to.id,
+        input: {
+          text: `${from.name} answered what you asked them:\n\n${answer}\n\nCarry on. Say what this means for the work, in your own words.`,
+          images: [],
+        },
+        depth,
+        inputInHistory: false,
+      }),
+    );
   }
 
   async #runTurn(options: {
@@ -341,6 +473,8 @@ export class OpenBotRuntime implements SkillHost {
     agentId: string;
     input: { text: string; images: string[] };
     depth: number;
+    /** False when the input was never posted as a message, so nothing is dropped. */
+    inputInHistory?: boolean;
   }): Promise<{ message: Message }> {
     const conversation = this.conversations.get(options.conversationId);
     const agent = this.agents.get(options.agentId);
@@ -351,7 +485,8 @@ export class OpenBotRuntime implements SkillHost {
     this.#turns.set(conversation.id, { controller, depth: options.depth });
 
     try {
-      const history = (await this.conversations.messages(conversation.id)).slice(0, -1);
+      const all = await this.conversations.messages(conversation.id);
+      const history = options.inputInHistory === false ? all : all.slice(0, -1);
       const outcome = await this.#runner.run(
         {
           agent,
@@ -376,9 +511,18 @@ export class OpenBotRuntime implements SkillHost {
         controller.signal,
       );
 
+      // A reply the person has not seen yet, so the sidebar can say so.
+      if (conversation.kind === 'dm' && outcome.message.body.trim()) {
+        const counted = await this.conversations.markUnread(conversation.id);
+        if (counted) this.bus.emit({ type: 'conversation.updated', conversation: counted });
+      }
+
       if (outcome.providerThreadId) {
         const updated = await this.conversations.patch(conversation.id, {
-          providerThreads: { ...conversation.providerThreads, [agent.id]: outcome.providerThreadId },
+          providerThreads: {
+            ...conversation.providerThreads,
+            [agent.id]: outcome.providerThreadId,
+          },
         });
         this.bus.emit({ type: 'conversation.updated', conversation: updated });
       }
@@ -411,17 +555,39 @@ export class OpenBotRuntime implements SkillHost {
   #view(definition: AgentDefinition): AgentView {
     const state = this.#status.get(definition.id);
     const conversation = this.conversations.get(dmConversationId(definition.id));
+    // Anything but idle is something the bot is doing right now, so it wins.
+    // Otherwise presence is simply whether it still holds this chat in mind.
+    const busy = state && state.status !== 'idle' ? state.status : undefined;
+    const present = Boolean(conversation?.providerThreads[definition.id]);
     return {
       definition,
-      status: state?.status ?? 'idle',
+      status: busy ?? (present ? 'idle' : 'offline'),
       ...(state?.detail ? { statusDetail: state.detail } : {}),
-      unread: 0,
+      unread: conversation?.unread ?? 0,
       ...(conversation?.lastMessageAt ? { lastMessageAt: conversation.lastMessageAt } : {}),
       ...(conversation?.lastMessagePreview
         ? { lastMessagePreview: conversation.lastMessagePreview }
         : {}),
     };
   }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** With nothing to match on, the opening of the message is the useful part. */
+function summarise(body: string): string {
+  const text = body.replace(/\s+/g, ' ').trim();
+  return text.length > 320 ? `${text.slice(0, 320)}…` : text;
+}
+
+/** A window around the match, so a hit reads as a sentence, not a fragment. */
+function excerpt(body: string, index: number): string {
+  const start = Math.max(0, index - 120);
+  const text = body
+    .slice(start, index + 200)
+    .replace(/\s+/g, ' ')
+    .trim();
+  return `${start > 0 ? '…' : ''}${text}${index + 200 < body.length ? '…' : ''}`;
 }
 
 /** Resolves the built MCP bridge that ships alongside core. */

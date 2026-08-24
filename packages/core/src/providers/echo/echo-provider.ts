@@ -1,5 +1,10 @@
 import type { ProviderHealth, ProviderInfo } from '@openbot/shared';
-import type { Provider, ProviderContext, ProviderRunInput, ProviderRunResult } from '../provider.js';
+import type {
+  Provider,
+  ProviderContext,
+  ProviderRunInput,
+  ProviderRunResult,
+} from '../provider.js';
 
 /**
  * A provider with no external dependencies. Useful for developing the UI, for
@@ -25,7 +30,9 @@ export class EchoProvider implements Provider {
     });
     const text = `${context.agent.name} here. You said: "${input.text}"`;
     context.emit({ kind: 'text-final', text });
-    return { finalText: text };
+    // A stand-in thread, so presence behaves the same as it does with a real
+    // provider: offline until spoken to, offline again once context is cleared.
+    return { finalText: text, providerThreadId: context.providerThreadId ?? 'echo-thread' };
   }
 
   async health(): Promise<ProviderHealth> {

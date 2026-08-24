@@ -98,7 +98,9 @@ export class ConversationStore {
   }
 
   /** Appends a message and refreshes the conversation's preview line. */
-  async append(input: Omit<Message, 'id' | 'createdAt'> & Partial<Pick<Message, 'id' | 'createdAt'>>): Promise<Message> {
+  async append(
+    input: Omit<Message, 'id' | 'createdAt'> & Partial<Pick<Message, 'id' | 'createdAt'>>,
+  ): Promise<Message> {
     const message = MessageSchema.parse({
       id: input.id ?? newId('msg'),
       createdAt: input.createdAt ?? new Date().toISOString(),
@@ -125,6 +127,24 @@ export class ConversationStore {
       await this.#touch(message);
     }
     return message;
+  }
+
+  /** One more message the person has not seen. Only ever counts the bot's. */
+  async markUnread(conversationId: string): Promise<Conversation | undefined> {
+    const conversation = this.#conversations.get(conversationId);
+    if (!conversation || conversation.kind !== 'dm') return undefined;
+    conversation.unread += 1;
+    await this.#persistConversations();
+    return conversation;
+  }
+
+  /** The person is looking at this chat. */
+  async markRead(conversationId: string): Promise<Conversation | undefined> {
+    const conversation = this.#conversations.get(conversationId);
+    if (!conversation || conversation.unread === 0) return conversation;
+    conversation.unread = 0;
+    await this.#persistConversations();
+    return conversation;
   }
 
   async #touch(message: Message): Promise<void> {

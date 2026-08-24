@@ -21,24 +21,25 @@ that carries an `Authorization` header.
 
 ## REST
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/health` | Liveness and project name. No auth. |
-| `GET` | `/api/project` | The manifest and its absolute root |
-| `GET` | `/api/providers` | Registered providers and their health |
-| `GET` | `/api/skills` | Every registered skill |
-| `GET` | `/api/agents` | Agents with live status and last message |
-| `POST` | `/api/agents` | Hire a bot → `{ agent, conversationId }` |
-| `PATCH` | `/api/agents/:id` | Update a bot |
-| `DELETE` | `/api/agents/:id` | Archive a bot (never deletes work) |
-| `GET` | `/api/agents/:id/skills` | The skills that bot may use |
-| `GET` | `/api/agents/:id/conversation` | The user's chat with that bot |
-| `GET` | `/api/conversations` | All conversations |
-| `GET` | `/api/conversations/:id/messages` | Full history, oldest first |
-| `POST` | `/api/conversations/:id/messages` | Send a message; starts a turn |
-| `POST` | `/api/conversations/:id/answer` | Answer an inline card |
-| `POST` | `/api/conversations/:id/abort` | Stop the running turn |
-| `POST` | `/api/skills/:id/invoke` | Run a skill as a bot (used by the bridge) |
+| Method   | Path                              | Purpose                                   |
+| -------- | --------------------------------- | ----------------------------------------- |
+| `GET`    | `/api/health`                     | Liveness and project name. No auth.       |
+| `GET`    | `/api/project`                    | The manifest and its absolute root        |
+| `GET`    | `/api/providers`                  | Registered providers and their health     |
+| `GET`    | `/api/skills`                     | Every registered skill                    |
+| `GET`    | `/api/agents`                     | Agents with live status and last message  |
+| `POST`   | `/api/agents`                     | Hire a bot → `{ agent, conversationId }`  |
+| `PATCH`  | `/api/agents/:id`                 | Update a bot                              |
+| `DELETE` | `/api/agents/:id`                 | Archive a bot (never deletes work)        |
+| `GET`    | `/api/agents/:id/skills`          | The skills that bot may use               |
+| `GET`    | `/api/agents/:id/conversation`    | The user's chat with that bot             |
+| `GET`    | `/api/conversations`              | All conversations                         |
+| `GET`    | `/api/conversations/:id/messages` | Full history, oldest first                |
+| `POST`   | `/api/conversations/:id/messages` | Send a message; starts a turn             |
+| `POST`   | `/api/conversations/:id/answer`   | Answer an inline card                     |
+| `POST`   | `/api/conversations/:id/read`     | Clear the unread count for that chat      |
+| `POST`   | `/api/conversations/:id/abort`    | Stop the running turn                     |
+| `POST`   | `/api/skills/:id/invoke`          | Run a skill as a bot (used by the bridge) |
 
 Request and response shapes are the zod schemas in `@openbot/shared`, so the
 client and server cannot drift.

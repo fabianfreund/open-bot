@@ -9,6 +9,10 @@
   --color-ink: #ececee;
   --color-muted: #8a8a93;
   --color-accent: #4f8ef7;
+  /* Tints that have to read on both themes: inline code, inputs, hovers. */
+  --color-code: rgba(255, 255, 255, 0.09);
+  --color-field: rgba(0, 0, 0, 0.25);
+  --color-hover: rgba(255, 255, 255, 0.05);
 }
 
 :root[data-theme='light'] {
@@ -20,6 +24,9 @@
   --color-ink: #1a1a1d;
   --color-muted: #74747c;
   --color-accent: #3568e0;
+  --color-code: rgba(0, 0, 0, 0.06);
+  --color-field: #ffffff;
+  --color-hover: rgba(0, 0, 0, 0.04);
 }
 
 html,
@@ -35,7 +42,9 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 /* The whole title bar is draggable except where controls live. */

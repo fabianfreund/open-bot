@@ -1,13 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { Info } from 'lucide-react';
+import type { ProviderHealth } from '@openbot/shared';
 import { useStore } from '../state/store.js';
+import { STATUS_OK, STATUS_WARN } from '../status-colors.js';
 
 /** Small top-right indicator; hover or click to see what is connected. */
 export function StatusInfo() {
   const link = useStore((s) => s.link);
-  const agents = useStore((s) => s.agents);
+  const client = useStore((s) => s.client);
   const [open, setOpen] = useState(false);
+  const [health, setHealth] = useState<ProviderHealth[]>([]);
   const ref = useRef<HTMLDivElement>(null);
+
+  // Provider health (is Codex actually signed in?) can change while the app
+  // sits open, so re-check each time someone looks rather than caching it.
+  useEffect(() => {
+    if (!open || !client) return;
+    let cancelled = false;
+    void client.providers().then((res) => {
+      if (!cancelled) setHealth(res.health);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, client]);
 
   useEffect(() => {
     if (!open) return;
@@ -19,7 +35,6 @@ export function StatusInfo() {
   }, [open]);
 
   const connected = link === 'open';
-  const providers = Array.from(new Set(agents.map((a) => a.definition.provider)));
 
   return (
     <div
@@ -38,10 +53,15 @@ export function StatusInfo() {
 
       {open && (
         <div className="absolute right-0 top-full z-40 pt-2">
-          <div className="w-48 rounded-lg border border-[var(--color-line)] bg-[var(--color-sidebar)] p-1.5 shadow-2xl">
+          <div className="w-56 rounded-lg border border-[var(--color-line)] bg-[var(--color-sidebar)] p-1.5 shadow-2xl">
             <StatusRow label={connected ? 'Connected' : 'Reconnecting'} ok={connected} />
-            {providers.map((provider) => (
-              <StatusRow key={provider} label={capitalize(provider)} ok={connected} />
+            {health.map((provider) => (
+              <StatusRow
+                key={provider.id}
+                label={capitalize(provider.id)}
+                detail={provider.detail}
+                ok={provider.ok}
+              />
             ))}
           </div>
         </div>
@@ -50,11 +70,19 @@ export function StatusInfo() {
   );
 }
 
-function StatusRow({ label, ok }: { label: string; ok: boolean }) {
+function StatusRow({ label, detail, ok }: { label: string; detail?: string; ok: boolean }) {
   return (
-    <div className="flex items-center gap-2 px-1.5 py-1 text-[12px]">
-      <span className="size-1.5 shrink-0 rounded-full" style={{ background: ok ? '#2fb673' : '#e0a13a' }} />
-      {label}
+    <div className="flex items-start gap-2 px-1.5 py-1">
+      <span
+        className="mt-1.5 size-1.5 shrink-0 rounded-full"
+        style={{ background: ok ? STATUS_OK : STATUS_WARN }}
+      />
+      <span className="min-w-0">
+        <span className="block text-[12px]">{label}</span>
+        {detail && (
+          <span className="block truncate text-[11px] text-[var(--color-muted)]">{detail}</span>
+        )}
+      </span>
     </div>
   );
 }

@@ -20,9 +20,7 @@ export type ServerEvent =
   | { type: 'notice'; level: 'info' | 'warn' | 'error'; text: string };
 
 /** Anything a client sends up the socket. Most writes go over REST instead. */
-export type ClientEvent =
-  | { type: 'ping' }
-  | { type: 'read'; conversationId: string };
+export type ClientEvent = { type: 'ping' } | { type: 'read'; conversationId: string };
 
 /**
  * Normalised stream events every provider emits. Providers translate their

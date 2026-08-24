@@ -44,7 +44,7 @@ export function Composer({ placeholder, busy, onSend, onStop }: Props) {
         {busy ? (
           <button
             onClick={onStop}
-            className="mb-0.5 flex size-7 items-center justify-center rounded-full bg-white/10 text-[var(--color-ink)] hover:bg-white/15"
+            className="mb-0.5 flex size-7 items-center justify-center rounded-full bg-[var(--color-code)] text-[var(--color-ink)] hover:opacity-80"
             title="Stop"
           >
             <span className="size-2.5 rounded-[2px] bg-current" />

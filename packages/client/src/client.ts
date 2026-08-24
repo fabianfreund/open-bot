@@ -1,15 +1,17 @@
-import type {
-  AgentDefinition,
-  AgentView,
-  Conversation,
-  CreateAgentRequest,
-  HealthResponse,
-  Message,
-  ProjectInfo,
-  ProviderHealth,
-  ProviderInfo,
-  SkillInfo,
-  UpdateAgentRequest,
+import {
+  authedFetch,
+  HttpError,
+  type AgentDefinition,
+  type AgentView,
+  type Conversation,
+  type CreateAgentRequest,
+  type HealthResponse,
+  type Message,
+  type ProjectInfo,
+  type ProviderHealth,
+  type ProviderInfo,
+  type SkillInfo,
+  type UpdateAgentRequest,
 } from '@openbot/shared';
 import { EventStream, type EventStreamHandlers } from './stream.js';
 
@@ -49,7 +51,9 @@ export class OpenBotClient {
     return this.#get('/api/providers');
   }
 
-  createAgent(request: CreateAgentRequest): Promise<{ agent: AgentDefinition; conversationId: string }> {
+  createAgent(
+    request: CreateAgentRequest,
+  ): Promise<{ agent: AgentDefinition; conversationId: string }> {
     return this.#send('POST', '/api/agents', request);
   }
   updateAgent(id: string, patch: UpdateAgentRequest): Promise<AgentDefinition> {
@@ -66,13 +70,23 @@ export class OpenBotClient {
     return this.#send('POST', `/api/conversations/${conversationId}/messages`, { text, images });
   }
   /** Answers an inline card; the reply continues the conversation. */
-  answerCard(conversationId: string, messageId: string, cardId: string, answer: string): Promise<void> {
+  answerCard(
+    conversationId: string,
+    messageId: string,
+    cardId: string,
+    answer: string,
+  ): Promise<void> {
     return this.#send('POST', `/api/conversations/${conversationId}/answer`, {
       messageId,
       cardId,
       answer,
     });
   }
+  /** Clears the unread count once the person is looking at the chat. */
+  markRead(conversationId: string): Promise<{ ok: boolean }> {
+    return this.#send('POST', `/api/conversations/${conversationId}/read`, {});
+  }
+
   abort(conversationId: string): Promise<{ stopped: boolean }> {
     return this.#send('POST', `/api/conversations/${conversationId}/abort`, {});
   }
@@ -92,17 +106,13 @@ export class OpenBotClient {
   }
 
   async #request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers: {
-        authorization: `Bearer ${this.token}`,
-        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      throw new OpenBotHttpError(res.status, describe(res.status), detail);
+    let res: Response;
+    try {
+      res = await authedFetch({ baseUrl: this.baseUrl, token: this.token, method, path, body });
+    } catch (err) {
+      if (err instanceof HttpError)
+        throw new OpenBotHttpError(err.status, describe(err.status), err.detail);
+      throw err;
     }
     if (res.status === 204) return undefined as T;
     return (await res.json()) as T;

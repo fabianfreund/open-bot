@@ -28,12 +28,22 @@ export class AgentStore {
       const parsed = AgentDefinitionSchema.safeParse(raw);
       if (parsed.success) this.#agents.set(parsed.data.id, parsed.data);
     }
+    // The brief is generated, so a bot hired before a skill existed would go on
+    // reading a brief that never mentions it. Rewrite them all on the way in.
+    for (const agent of this.#agents.values()) {
+      if (!agent.archived) await this.#writeInstructions(agent);
+    }
   }
 
   list(): AgentDefinition[] {
     return [...this.#agents.values()]
       .filter((a) => !a.archived)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  /** Everyone, including the ones who have left the team. */
+  listAll(): AgentDefinition[] {
+    return [...this.#agents.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
   get(id: string): AgentDefinition | undefined {
@@ -98,7 +108,10 @@ export class AgentStore {
       },
       provider: patch.provider ?? current.provider,
       providerOptions: { ...current.providerOptions, ...(patch.providerOptions ?? {}) },
-      workspace: { ...current.workspace, shared: patch.sharedWorkspaces ?? current.workspace.shared },
+      workspace: {
+        ...current.workspace,
+        shared: patch.sharedWorkspaces ?? current.workspace.shared,
+      },
       skills: patch.skills ?? current.skills,
       archived: patch.archived ?? current.archived,
       updatedAt: new Date().toISOString(),
@@ -116,6 +129,11 @@ export class AgentStore {
 
   async #persist(definition: AgentDefinition): Promise<void> {
     await writeJson(this.project.paths.agentFile(definition.slug), definition);
+    await this.#writeInstructions(definition);
+  }
+
+  /** `agents/<slug>/workspace/AGENTS.md`, the brief the provider reads. */
+  async #writeInstructions(definition: AgentDefinition): Promise<void> {
     await fs.writeFile(
       this.project.paths.agentInstructionsFile(definition.slug),
       renderInstructions(definition, this.project.file),

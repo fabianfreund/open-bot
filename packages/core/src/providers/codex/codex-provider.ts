@@ -3,8 +3,19 @@ import { Codex, type ThreadEvent, type ThreadItem, type ThreadOptions } from '@o
 /** `CodexConfigObject` is not exported by the SDK; this is the same shape. */
 type CodexConfig = NonNullable<NonNullable<ConstructorParameters<typeof Codex>[0]>['config']>;
 import type { ProviderHealth, ProviderInfo, ProviderStreamEvent } from '@openbot/shared';
-import type { Provider, ProviderContext, ProviderRunInput, ProviderRunResult } from '../provider.js';
-import { describeCommand, describeFileChanges, describeSkillCall, truncate, unwrapCommand } from './humanize.js';
+import type {
+  Provider,
+  ProviderContext,
+  ProviderRunInput,
+  ProviderRunResult,
+} from '../provider.js';
+import {
+  describeCommand,
+  describeFileChanges,
+  describeSkillCall,
+  truncate,
+  unwrapCommand,
+} from './humanize.js';
 import { locateCodex } from './locate.js';
 import { buildBrief, buildRecap } from './prompt.js';
 
@@ -69,7 +80,9 @@ export class CodexProvider implements Provider {
       : codex.resumeThread(context.providerThreadId!, threadOptions);
 
     const prompt = isNewThread
-      ? [buildBrief(context.agent), buildRecap(context.history), input.text].filter(Boolean).join('\n\n')
+      ? [buildBrief(context.agent), buildRecap(context.history), input.text]
+          .filter(Boolean)
+          .join('\n\n')
       : input.text;
 
     const payload =
@@ -113,7 +126,10 @@ export class CodexProvider implements Provider {
     if (!(await locateCodex(this.options.codexPath))) {
       return { id: this.info.id, ok: false, detail: CODEX_MISSING };
     }
-    const authFile = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'auth.json');
+    const authFile = path.join(
+      process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'),
+      'auth.json',
+    );
     try {
       const raw = JSON.parse(await fs.readFile(authFile, 'utf8')) as {
         tokens?: { access_token?: string };
@@ -125,9 +141,17 @@ export class CodexProvider implements Provider {
       if (raw.OPENAI_API_KEY) {
         return { id: this.info.id, ok: true, detail: 'Using an OpenAI API key.' };
       }
-      return { id: this.info.id, ok: false, detail: 'Codex is installed but not signed in. Run `codex login`.' };
+      return {
+        id: this.info.id,
+        ok: false,
+        detail: 'Codex is installed but not signed in. Run `codex login`.',
+      };
     } catch {
-      return { id: this.info.id, ok: false, detail: 'Codex is not set up. Install it, then run `codex login`.' };
+      return {
+        id: this.info.id,
+        ok: false,
+        detail: 'Codex is not set up. Install it, then run `codex login`.',
+      };
     }
   }
 
@@ -172,7 +196,9 @@ export class CodexProvider implements Provider {
       approvalPolicy: 'never',
       skipGitRepoCheck: true,
       webSearchEnabled: webSearch,
-      ...(typeof effort === 'string' ? { modelReasoningEffort: effort as ThreadOptions['modelReasoningEffort'] } : {}),
+      ...(typeof effort === 'string'
+        ? { modelReasoningEffort: effort as ThreadOptions['modelReasoningEffort'] }
+        : {}),
     };
   }
 }
@@ -237,7 +263,8 @@ function mapItem(
           id: item.id,
           traceKind: 'command',
           title: describeCommand(item.command, failed ? 'failed' : status),
-          detail: `${unwrapCommand(item.command)}\n\n${truncate(item.aggregated_output ?? '')}`.trim(),
+          detail:
+            `${unwrapCommand(item.command)}\n\n${truncate(item.aggregated_output ?? '')}`.trim(),
           status: failed ? 'failed' : item.status === 'in_progress' ? 'in-progress' : 'completed',
         },
       ];
@@ -265,7 +292,11 @@ function mapItem(
               : `Used ${item.tool.replace(/_/g, ' ')}`,
           detail: item.error?.message,
           status:
-            item.status === 'failed' ? 'failed' : item.status === 'in_progress' ? 'in-progress' : 'completed',
+            item.status === 'failed'
+              ? 'failed'
+              : item.status === 'in_progress'
+                ? 'in-progress'
+                : 'completed',
         },
       ];
     case 'web_search':

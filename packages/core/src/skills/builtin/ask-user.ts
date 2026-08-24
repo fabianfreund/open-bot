@@ -7,7 +7,9 @@ const Input = z.object({
   options: z
     .array(z.string())
     .default([])
-    .describe('Answers they can tap instead of typing. Use these whenever the choices are obvious.'),
+    .describe(
+      'Answers they can tap instead of typing. Use these whenever the choices are obvious.',
+    ),
   allowFreeText: z
     .boolean()
     .default(true)

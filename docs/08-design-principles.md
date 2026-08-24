@@ -6,19 +6,19 @@ like it. That is the thing to get away from.
 
 ## Talk about the work, not the machinery
 
-Nowhere in the interface do the words *token*, *model*, *prompt*, *context
-window*, *sandbox*, or *repository* appear. A bot does not "execute a tool
+Nowhere in the interface do the words _token_, _model_, _prompt_, _context
+window_, _sandbox_, or _repository_ appear. A bot does not "execute a tool
 call"; it messages a colleague. A bot is not "an agent instance"; it is someone
 who works for you.
 
 This runs deeper than labels. `humanize.ts` in the Codex provider translates
 what the model actually did into what a person would say it did:
 
-| What happened | What is shown |
-| --- | --- |
-| `bash -lc 'rg "schedule" .'` | Searched the files |
-| `apply_patch` on three files | Updated 3 files |
-| `mcp_tool_call openbot/message_bot` | Messaged Social |
+| What happened                       | What is shown      |
+| ----------------------------------- | ------------------ |
+| `bash -lc 'rg "schedule" .'`        | Searched the files |
+| `apply_patch` on three files        | Updated 3 files    |
+| `mcp_tool_call openbot/message_bot` | Messaged Social    |
 
 The raw detail is one click away for anyone who wants it. It is never the
 first thing you see.
@@ -43,13 +43,14 @@ newsletter".
 
 ## A new team is never empty
 
-Creating a team immediately hires **Setup**, which introduces itself and asks
+Creating a team immediately hires **Setty**, which introduces itself and asks
 what you need. The greeting and its first question are written in code, not
 generated, so a brand-new project is useful the instant it opens and does not
 depend on a model call succeeding.
 
-Setup's job is to interview you and hire the rest of the team. At most four
-bots to start, because a wall of new colleagues is not a good first impression.
+Setty's job is to interview you, hire the rest of the team, and change it later
+when the work changes. At most four bots to start, because a wall of new
+colleagues is not a good first impression.
 
 ## Bots are colleagues, not commands
 

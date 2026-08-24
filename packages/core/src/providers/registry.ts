@@ -12,7 +12,9 @@ export class ProviderRegistry {
   get(id: string): Provider {
     const provider = this.#providers.get(id);
     if (!provider) {
-      throw new Error(`Unknown provider "${id}". Registered: ${[...this.#providers.keys()].join(', ')}`);
+      throw new Error(
+        `Unknown provider "${id}". Registered: ${[...this.#providers.keys()].join(', ')}`,
+      );
     }
     return provider;
   }

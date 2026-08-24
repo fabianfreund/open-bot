@@ -24,6 +24,8 @@ export const ConversationSchema = z.object({
    */
   providerThreads: z.record(z.string(), z.string()).default({}),
   createdAt: z.string(),
+  /** Messages from the bot the person has not looked at yet. */
+  unread: z.number().int().min(0).default(0),
   lastMessageAt: z.string().optional(),
   lastMessagePreview: z.string().optional(),
 });

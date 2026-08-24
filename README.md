@@ -67,17 +67,17 @@ apps/desktop         the Electron chat app
 
 ## Docs
 
-| Doc | What is in it |
-| --- | --- |
-| [01-concepts.md](docs/01-concepts.md) | The words this project uses and what they mean |
-| [02-architecture.md](docs/02-architecture.md) | How the pieces fit and why |
-| [03-project-format.md](docs/03-project-format.md) | What is on disk in a project folder |
-| [04-providers.md](docs/04-providers.md) | Adding a model backend |
-| [05-skills.md](docs/05-skills.md) | Adding a skill |
-| [06-protocol.md](docs/06-protocol.md) | The HTTP and WebSocket API |
-| [07-networking.md](docs/07-networking.md) | Hosting, pairing, and Tailscale |
-| [08-design-principles.md](docs/08-design-principles.md) | The rules the UI and copy follow |
-| [09-roadmap.md](docs/09-roadmap.md) | What is built and what is next |
+| Doc                                                     | What is in it                                  |
+| ------------------------------------------------------- | ---------------------------------------------- |
+| [01-concepts.md](docs/01-concepts.md)                   | The words this project uses and what they mean |
+| [02-architecture.md](docs/02-architecture.md)           | How the pieces fit and why                     |
+| [03-project-format.md](docs/03-project-format.md)       | What is on disk in a project folder            |
+| [04-providers.md](docs/04-providers.md)                 | Adding a model backend                         |
+| [05-skills.md](docs/05-skills.md)                       | Adding a skill                                 |
+| [06-protocol.md](docs/06-protocol.md)                   | The HTTP and WebSocket API                     |
+| [07-networking.md](docs/07-networking.md)               | Hosting, pairing, and Tailscale                |
+| [08-design-principles.md](docs/08-design-principles.md) | The rules the UI and copy follow               |
+| [09-roadmap.md](docs/09-roadmap.md)                     | What is built and what is next                 |
 
 ## Licence
 

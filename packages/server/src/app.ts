@@ -72,6 +72,7 @@ export async function startServer(options: StartServerOptions): Promise<ServerHa
     app,
     url,
     close: async () => {
+      runtime.close();
       await app.close();
     },
   };
@@ -82,11 +83,7 @@ export async function startServer(options: StartServerOptions): Promise<ServerHa
  * Walking to the next free one keeps "New team" from failing on a number,
  * which previously left a project on disk that the app refused to reopen.
  */
-async function listenWithFallback(
-  app: FastifyInstance,
-  host: string,
-  port: number,
-): Promise<void> {
+async function listenWithFallback(app: FastifyInstance, host: string, port: number): Promise<void> {
   if (port === 0) {
     await app.listen({ port: 0, host });
     return;

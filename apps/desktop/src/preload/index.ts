@@ -15,6 +15,8 @@ const bridge: OpenBotBridge = {
   disconnect: () => ipcRenderer.invoke('disconnect'),
   shareInvite: () => ipcRenderer.invoke('shareInvite'),
   revealProject: (target) => ipcRenderer.invoke('revealProject', target),
+  openTarget: (target) => ipcRenderer.invoke('openTarget', target),
+  copyText: (text) => ipcRenderer.invoke('copyText', text),
   onConnection: (listener) => {
     const handler = (_event: unknown, connection: Parameters<typeof listener>[0]) =>
       listener(connection);

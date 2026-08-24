@@ -76,6 +76,7 @@ const INPUT =
   'w-full rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-[13px] outline-none placeholder:text-[#55555d] focus:border-[var(--color-accent)]';
 const PRIMARY =
   'rounded-lg bg-[var(--color-accent)] px-3.5 py-2 text-[13px] font-medium text-white disabled:opacity-40';
-const GHOST = 'rounded-lg px-3.5 py-2 text-[13px] text-[var(--color-muted)] hover:text-[var(--color-ink)]';
+const GHOST =
+  'rounded-lg px-3.5 py-2 text-[13px] text-[var(--color-muted)] hover:text-[var(--color-ink)]';
 
 export { INPUT, PRIMARY, GHOST };

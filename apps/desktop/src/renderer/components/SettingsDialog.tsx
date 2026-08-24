@@ -20,7 +20,13 @@ export function SettingsDialog({ connection, onClose, onLeave }: Props) {
   return (
     <Dialog title={connection.projectName} onClose={onClose}>
       <Row label="Mode" value={connection.mode === 'host' ? 'Hosting' : 'Connected'} />
-      {connection.root && <Row label="Folder" value={connection.root} onClick={() => void window.openbot.revealProject(connection.root!)} />}
+      {connection.root && (
+        <Row
+          label="Folder"
+          value={connection.root}
+          onClick={() => void window.openbot.revealProject(connection.root!)}
+        />
+      )}
       {invite && (
         <>
           <Row label="Address" value={invite.url} />

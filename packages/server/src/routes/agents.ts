@@ -8,7 +8,9 @@ export async function agentRoutes(app: FastifyInstance, runtime: OpenBotRuntime)
   app.post('/api/agents', async (request, reply) => {
     const parsed = CreateAgentRequestSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'bad_request', detail: parsed.error.issues[0]?.message });
+      return reply
+        .code(400)
+        .send({ error: 'bad_request', detail: parsed.error.issues[0]?.message });
     }
     const agent = await runtime.createAgent(parsed.data);
     const conversation = await runtime.conversationFor(agent.id);
@@ -18,7 +20,9 @@ export async function agentRoutes(app: FastifyInstance, runtime: OpenBotRuntime)
   app.patch<{ Params: { id: string } }>('/api/agents/:id', async (request, reply) => {
     const parsed = UpdateAgentRequestSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'bad_request', detail: parsed.error.issues[0]?.message });
+      return reply
+        .code(400)
+        .send({ error: 'bad_request', detail: parsed.error.issues[0]?.message });
     }
     try {
       return await runtime.updateAgent(request.params.id, parsed.data);

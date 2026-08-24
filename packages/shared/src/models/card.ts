@@ -39,3 +39,26 @@ export function questionCard(id: string, props: QuestionCardProps): Card {
     answered: false,
   };
 }
+
+/** One thing a person can open from the chat. */
+export interface LinkItem {
+  label: string;
+  /** A web address, or an absolute path to a file or folder on this computer. */
+  target: string;
+  /** One short line about what it is. */
+  note?: string;
+}
+
+/** Props for the built-in `link` card. The message body says why; this is the what. */
+export interface LinkCardProps {
+  items: LinkItem[];
+}
+
+export function linkCard(id: string, props: LinkCardProps): Card {
+  return {
+    id,
+    type: 'link',
+    props: { ...props },
+    answered: false,
+  };
+}

@@ -25,11 +25,6 @@ export async function locateCodex(explicit?: string): Promise<string | null> {
   return cached;
 }
 
-/** Forgets the cached location. Used after the user installs Codex. */
-export function forgetCodexLocation(): void {
-  cached = undefined;
-}
-
 async function search(): Promise<string | null> {
   const fromEnv = process.env.OPENBOT_CODEX_PATH;
   if (fromEnv && (await isExecutable(fromEnv))) return fromEnv;

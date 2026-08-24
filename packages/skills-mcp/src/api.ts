@@ -1,4 +1,4 @@
-import type { SkillInfo, SkillResult } from '@openbot/shared';
+import { authedFetch, HttpError, type SkillInfo, type SkillResult } from '@openbot/shared';
 import type { BridgeConfig } from './config.js';
 
 /** Thin client for the two endpoints the bridge needs. */
@@ -13,27 +13,29 @@ export class OpenBotApi {
   async invoke(skillId: string, input: unknown): Promise<SkillResult> {
     const res = await this.#fetch(`/api/skills/${skillId}/invoke`, {
       method: 'POST',
-      body: JSON.stringify({
+      body: {
         agentId: this.config.agentId,
         conversationId: this.config.conversationId,
         input: input ?? {},
-      }),
+      },
     });
     return (await res.json()) as SkillResult;
   }
 
-  async #fetch(path: string, init: RequestInit = {}): Promise<Response> {
-    const res = await fetch(`${this.config.serverUrl}${path}`, {
-      ...init,
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${this.config.token}`,
-        ...(init.headers ?? {}),
-      },
-    });
-    if (!res.ok) {
-      throw new Error(`OpenBot ${path} responded ${res.status}: ${await res.text()}`);
+  async #fetch(path: string, options: { method?: string; body?: unknown } = {}): Promise<Response> {
+    try {
+      return await authedFetch({
+        baseUrl: this.config.serverUrl,
+        token: this.config.token,
+        path,
+        method: options.method,
+        body: options.body,
+      });
+    } catch (err) {
+      if (err instanceof HttpError) {
+        throw new Error(`OpenBot ${path} responded ${err.status}: ${err.detail}`);
+      }
+      throw err;
     }
-    return res;
   }
 }

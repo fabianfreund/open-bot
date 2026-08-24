@@ -6,21 +6,24 @@ OpenBot's skills are the ones that make a collection of bots into a team.
 
 ## What ships
 
-| Skill | What it does |
-| --- | --- |
-| `list_bots` | See who is on the team and what they own |
-| `hire_bot` | Create a new colleague |
-| `message_bot` | Pass work to a colleague; their answer comes back to the chat |
-| `ask_user` | Ask the person a question, with tappable options |
-| `remember` | Write a note to `memory/` for the whole team |
+| Skill         | What it does                                                 |
+| ------------- | ------------------------------------------------------------ |
+| `list_bots`   | See who is on the team, what they own, and what they may use |
+| `hire_bot`    | Create a new colleague, with the skills that job needs       |
+| `change_bot`  | Rename a colleague, rewrite their brief, change their skills |
+| `retire_bot`  | Take a colleague off the team; nothing is deleted            |
+| `message_bot` | Pass work to a colleague; their answer comes back to you     |
+| `ask_user`    | Ask the person a question, with tappable options             |
+| `share_link`  | Put buttons in the chat that open a file, folder, or page    |
+| `remember`    | Write a note to `memory/` for the whole team                 |
 
 ## The interface
 
 ```ts
 export interface Skill<TInput> {
-  id: string;              // snake_case; this is the tool name the model sees
+  id: string; // snake_case; this is the tool name the model sees
   title: string;
-  description: string;     // written for the model, in the same plain language as the UI
+  description: string; // written for the model, in the same plain language as the UI
   input: z.ZodType<TInput>;
   sensitive?: boolean;
   run(input: TInput, context: SkillContext): Promise<SkillResult>;

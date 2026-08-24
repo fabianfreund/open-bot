@@ -22,7 +22,7 @@ export function QuestionCard({ card, onAnswer }: CardProps) {
             <button
               key={option}
               onClick={() => onAnswer(option)}
-              className="rounded-full border border-[var(--color-line)] px-3 py-1.5 text-[12.5px] hover:border-[var(--color-accent)] hover:bg-white/5"
+              className="rounded-full border border-[var(--color-line)] px-3 py-1.5 text-[12.5px] hover:border-[var(--color-accent)] hover:bg-[var(--color-hover)]"
             >
               {option}
             </button>
@@ -38,12 +38,12 @@ export function QuestionCard({ card, onAnswer }: CardProps) {
               if (event.key === 'Enter' && text.trim()) onAnswer(text.trim());
             }}
             placeholder="Or type an answer"
-            className="flex-1 rounded-lg border border-[var(--color-line)] bg-black/25 px-2.5 py-1.5 text-[12.5px] outline-none placeholder:text-[#55555d] focus:border-[var(--color-accent)]"
+            className="flex-1 rounded-lg border border-[var(--color-line)] bg-[var(--color-field)] px-2.5 py-1.5 text-[12.5px] outline-none placeholder:text-[var(--color-muted)] focus:border-[var(--color-accent)]"
           />
           <button
             onClick={() => text.trim() && onAnswer(text.trim())}
             disabled={!text.trim()}
-            className="rounded-lg bg-white/10 px-2.5 text-[12.5px] disabled:opacity-30"
+            className="rounded-lg bg-[var(--color-code)] px-2.5 text-[12.5px] disabled:opacity-30"
           >
             Send
           </button>

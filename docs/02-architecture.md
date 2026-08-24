@@ -40,14 +40,14 @@ the runtime straight into IPC.
 
 ## Packages
 
-| Package | Responsibility | Depends on |
-| --- | --- | --- |
-| `@openbot/shared` | Types, zod schemas, the wire protocol | nothing |
-| `@openbot/core` | The whole backend: state, providers, skills, turns | shared |
-| `@openbot/server` | HTTP + WebSocket over a runtime | shared, core |
-| `@openbot/client` | Typed client for that API | shared |
-| `@openbot/skills-mcp` | Exposes skills to a provider over MCP | shared |
-| `@openbot/desktop` | Electron app | all of the above |
+| Package               | Responsibility                                     | Depends on       |
+| --------------------- | -------------------------------------------------- | ---------------- |
+| `@openbot/shared`     | Types, zod schemas, the wire protocol              | nothing          |
+| `@openbot/core`       | The whole backend: state, providers, skills, turns | shared           |
+| `@openbot/server`     | HTTP + WebSocket over a runtime                    | shared, core     |
+| `@openbot/client`     | Typed client for that API                          | shared           |
+| `@openbot/skills-mcp` | Exposes skills to a provider over MCP              | shared           |
+| `@openbot/desktop`    | Electron app                                       | all of the above |
 
 Dependencies point one way. `core` has never heard of HTTP; `server` has never
 heard of Electron.
@@ -98,8 +98,12 @@ When Chief of Staff messages Social:
 1. A channel conversation `a2a.<a>.<b>` is created if it does not exist.
 2. The request is appended to that channel, authored by Chief of Staff.
 3. Social runs a turn in the channel, in its own thread and its own workspace.
-4. Social's answer is relayed back into the conversation that asked for it,
-   marked `relayedFrom`, which is what the UI shows as "Message from Social".
+4. Social's answer goes back to Chief of Staff, which runs another turn in the
+   conversation it asked from and speaks there in its own voice.
+
+Social never posts into a chat the person opened with Chief of Staff. A chat
+with one bot only ever contains that bot. If Social needs the person, it uses
+`ask_user`, which lands in Social's own chat.
 
 Two guards keep this from running away:
 
@@ -107,20 +111,60 @@ Two guards keep this from running away:
 - **Deadlock.** Waiting on a colleague who is already working on your request
   is refused rather than hung.
 
-By default `wait` is false: the asking bot finishes its turn and the answer
-arrives later as its own message. That matches how people actually work, and it
+By default `wait` is false: the asking bot finishes its turn, and the answer
+wakes it again when it lands. That matches how people actually work, and it
 means a slow colleague never blocks a chat.
+
+## What a bot remembers
+
+Three different lifetimes, and it matters which is which:
+
+- **History** is forever. `.openbot/messages/<conversation>.jsonl` is appended
+  to and never trimmed. Nothing here is ever deleted.
+- **The provider thread** is not. Codex holds the live context behind a thread
+  id in `conversation.providerThreads[agentId]`. That thread is dropped when a
+  bot is renamed or rebriefed, because it carries the old brief with it.
+- **The recap** bridges the two. A fresh thread over an existing chat gets the
+  brief plus the last 12 messages, and is told how many it did not get. From
+  there `look_back` fetches anything older, by words or by date.
+
+Sessions end on their own. Every minute the runtime drops the thread of any
+chat quiet for longer than `settings.sessionMinutes` (60 by default), so a team
+left open overnight is not holding context nobody is using. A bot with no live
+thread shows a **grey dot**: still on the team, not holding this chat in mind.
+Messaging it starts a new session and turns the dot green. Presence is derived
+from the thread, not stored, so it survives a restart and cannot drift out of
+sync with what the bot actually holds.
+
+Retiring is the other thing entirely, and only ever manual: going offline costs
+nothing and reverses itself, retiring means you are done with that colleague.
+
+That last part is the whole design: a bot is never quietly missing something.
+When the recap is short it says so, and `look_back` searches every message in
+every chat that bot has been part of, retired colleagues included.
+
+## Leaving the team
+
+Nothing is deleted, ever. `retire_bot` (or `DELETE /api/agents/:id`) sets
+`archived: true`, and that is all it does:
+
+- The bot stops appearing in `list_bots` and in the sidebar.
+- `agents/<slug>/` keeps its workspace, its brief, and its work.
+- Every chat it was in stays, and `look_back` still finds what it said.
+- Messaging it says it has left the team, not that it never existed.
+
+Nothing archives a bot on its own. It only happens when someone asks.
 
 ## Extension points
 
 Four, all the same shape. Each is a registry you add to.
 
-| To add | Write | Register in |
-| --- | --- | --- |
-| A model backend | a `Provider` | `OpenBotRuntime.open` |
-| A capability | a `Skill` | `skills/builtin/index.ts` |
-| An inline chat block | a card component | `renderer/components/cards/index.tsx` |
-| A storage layout | change `ProjectPaths` | one file |
+| To add               | Write                 | Register in                           |
+| -------------------- | --------------------- | ------------------------------------- |
+| A model backend      | a `Provider`          | `OpenBotRuntime.open`                 |
+| A capability         | a `Skill`             | `skills/builtin/index.ts`             |
+| An inline chat block | a card component      | `renderer/components/cards/index.tsx` |
+| A storage layout     | change `ProjectPaths` | one file                              |
 
 ## Why files and not a database
 

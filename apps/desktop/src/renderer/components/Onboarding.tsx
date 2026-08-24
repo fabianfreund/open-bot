@@ -41,7 +41,10 @@ export function Onboarding({ bootstrap, onConnected }: Props) {
             >
               Open a team
             </button>
-            <button onClick={() => setMode('join')} className={`${GHOST} w-full border border-[var(--color-line)]`}>
+            <button
+              onClick={() => setMode('join')}
+              className={`${GHOST} w-full border border-[var(--color-line)]`}
+            >
               Connect to a computer
             </button>
             {bootstrap.recentProjects.length > 0 && (

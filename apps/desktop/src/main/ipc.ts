@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
 import { OpenBotClient } from '@openbot/client';
 import type { Bootstrap, Connection, FolderInfo } from '../shared-ipc.js';
 import { ConfigStore } from './config.js';
@@ -113,5 +113,19 @@ export function registerIpc(config: ConfigStore, host: Host): void {
 
   ipcMain.handle('revealProject', async (_event, target: string): Promise<void> => {
     shell.showItemInFolder(target);
+  });
+
+  // Only http(s) and mailto reach the browser; everything else is a local path.
+  ipcMain.handle('openTarget', async (_event, target: string): Promise<void> => {
+    if (/^(https?|mailto):/i.test(target)) {
+      await shell.openExternal(target);
+      return;
+    }
+    if (!path.isAbsolute(target)) return;
+    await shell.openPath(target);
+  });
+
+  ipcMain.handle('copyText', async (_event, text: string): Promise<void> => {
+    clipboard.writeText(text);
   });
 }

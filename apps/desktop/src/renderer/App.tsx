@@ -15,12 +15,20 @@ export function App() {
   const leave = useStore((s) => s.leave);
   const hireBot = useStore((s) => s.hireBot);
   const setError = useStore((s) => s.setError);
+  const markRead = useStore((s) => s.markRead);
 
   const [dialog, setDialog] = useState<'new-bot' | 'settings' | null>(null);
 
   useEffect(() => {
     void init();
   }, [init]);
+
+  // Coming back to the window counts as reading whatever is on screen.
+  useEffect(() => {
+    const onFocus = () => void markRead();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [markRead]);
 
   if (!bootstrap) return <div className="h-full" />;
 
@@ -33,9 +41,7 @@ export function App() {
       <Sidebar onNewBot={() => setDialog('new-bot')} onSettings={() => setDialog('settings')} />
       <ChatPane />
 
-      {dialog === 'new-bot' && (
-        <NewBotDialog onClose={() => setDialog(null)} onCreate={hireBot} />
-      )}
+      {dialog === 'new-bot' && <NewBotDialog onClose={() => setDialog(null)} onCreate={hireBot} />}
       {dialog === 'settings' && (
         <SettingsDialog
           connection={connection}

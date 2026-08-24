@@ -28,9 +28,10 @@ export interface TurnRequest {
   provider: Provider;
   input: ProviderRunInput;
   history: Message[];
-  context: Omit<ProviderContext, 'emit' | 'signal' | 'agent' | 'conversation' | 'history' | 'providerThreadId'>;
-  /** Set when the reply is being relayed from another agent's channel. */
-  relayedFrom?: string;
+  context: Omit<
+    ProviderContext,
+    'emit' | 'signal' | 'agent' | 'conversation' | 'history' | 'providerThreadId'
+  >;
 }
 
 export interface TurnOutcome {
@@ -58,7 +59,6 @@ export class TurnRunner {
       cards: [],
       createdAt: new Date().toISOString(),
       streaming: true,
-      ...(request.relayedFrom ? { relayedFrom: request.relayedFrom } : {}),
     });
 
     await this.deps.conversations.replace(message, false);
@@ -84,7 +84,7 @@ export class TurnRunner {
           dirty = true;
           break;
         case 'trace':
-          message = { ...message, parts: upsertPart(message.parts, event) };
+          message = { ...message, parts: upsertPart(message.parts, event, message.body.length) };
           dirty = true;
           break;
         case 'status':
@@ -99,12 +99,11 @@ export class TurnRunner {
         case 'error':
           message = {
             ...message,
-            parts: upsertPart(message.parts, {
-              id: newId('err'),
-              traceKind: 'error',
-              title: event.message,
-              status: 'failed',
-            }),
+            parts: upsertPart(
+              message.parts,
+              { id: newId('err'), traceKind: 'error', title: event.message, status: 'failed' },
+              message.body.length,
+            ),
           };
           dirty = true;
           break;
@@ -148,33 +147,45 @@ export class TurnRunner {
         body: message.body || (aborted ? 'Stopped.' : ''),
         parts: aborted
           ? message.parts
-          : upsertPart(message.parts, {
-              id: newId('err'),
-              traceKind: 'error',
-              title: friendlyError(err),
-              status: 'failed',
-            }),
+          : upsertPart(
+              message.parts,
+              { id: newId('err'), traceKind: 'error', title: friendlyError(err), status: 'failed' },
+              message.body.length,
+            ),
       };
       await this.deps.conversations.replace(message, true);
       this.deps.bus.emit({ type: 'message.updated', message });
-      this.deps.onStatus(agent.id, aborted ? 'idle' : 'error', aborted ? undefined : friendlyError(err));
+      this.deps.onStatus(
+        agent.id,
+        aborted ? 'idle' : 'error',
+        aborted ? undefined : friendlyError(err),
+      );
       return { message };
     }
   }
 }
 
+/** `at` is where the step landed in the text, and is set once, when it starts. */
 function upsertPart(
   parts: TracePart[],
-  incoming: { id: string; traceKind: TracePart['kind']; title: string; detail?: string; status: TracePart['status'] },
+  incoming: {
+    id: string;
+    traceKind: TracePart['kind'];
+    title: string;
+    detail?: string;
+    status: TracePart['status'];
+  },
+  at: number,
 ): TracePart[] {
+  const index = parts.findIndex((p) => p.id === incoming.id);
   const part: TracePart = {
     id: incoming.id,
     kind: incoming.traceKind,
     title: incoming.title,
     status: incoming.status,
+    at: index === -1 ? at : (parts[index]?.at ?? at),
     ...(incoming.detail ? { detail: incoming.detail } : {}),
   };
-  const index = parts.findIndex((p) => p.id === part.id);
   if (index === -1) return [...parts, part];
   const next = [...parts];
   next[index] = part;
@@ -189,7 +200,8 @@ function friendlyError(err: unknown): string {
   if (/Unable to locate Codex CLI/i.test(raw)) {
     return 'Codex is not installed on this computer. Install it, then run `codex login`.';
   }
-  if (/ENOENT|not found/i.test(raw) && /codex/i.test(raw)) return 'Codex is not installed on this computer.';
+  if (/ENOENT|not found/i.test(raw) && /codex/i.test(raw))
+    return 'Codex is not installed on this computer.';
   if (/rate limit|429/i.test(raw)) return 'Hit a rate limit. Try again shortly.';
   if (/usage limit|quota/i.test(raw)) return 'Your Codex usage limit is reached.';
   return raw.split('\n')[0]?.slice(0, 300) ?? 'Something went wrong.';

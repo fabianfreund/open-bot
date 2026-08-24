@@ -1,4 +1,6 @@
 import { Fragment, useMemo } from 'react';
+import { openTarget } from '../open.js';
+import { useTargetMenu } from './TargetMenu.js';
 
 /**
  * Just enough markdown for chat: bullets, bold, inline code, paragraphs.
@@ -58,20 +60,44 @@ function parse(text: string): Block[] {
   return blocks;
 }
 
-/** Handles `**bold**` and `` `code` ``. */
+/** Handles `**bold**`, `` `code` ``, `[text](target)`, and bare web addresses. */
 function inline(text: string) {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  const parts = text.split(/(`[^`]+`|\[[^\]]+\]\([^)\s]+\)|\*\*[^*]+\*\*|https?:\/\/[^\s<>)\]]+)/g);
   return parts.map((part, index) => {
+    const link = part.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
+    if (link) return <Link key={index} label={link[1]!} target={link[2]!} />;
+    if (/^https?:\/\//i.test(part)) return <Link key={index} label={part} target={part} />;
     if (part.startsWith('**') && part.endsWith('**')) {
       return <strong key={index}>{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
       return (
-        <code key={index} className="rounded bg-white/8 px-1 py-0.5 font-mono text-[12px]">
+        <code
+          key={index}
+          className="rounded bg-[var(--color-code)] px-1 py-px font-mono text-[0.92em]"
+        >
           {part.slice(1, -1)}
         </code>
       );
     }
     return <Fragment key={index}>{part}</Fragment>;
   });
+}
+
+/** Links open where they belong: the browser for the web, Finder for a file. */
+function Link({ label, target }: { label: string; target: string }) {
+  const { openMenu, menu } = useTargetMenu();
+  return (
+    <>
+      <button
+        onClick={() => openTarget(target)}
+        onContextMenu={(event) => openMenu(event, target)}
+        title={target}
+        className="cursor-pointer text-[var(--color-accent)] underline decoration-[var(--color-accent)]/40 underline-offset-2 hover:decoration-[var(--color-accent)]"
+      >
+        {label}
+      </button>
+      {menu}
+    </>
+  );
 }

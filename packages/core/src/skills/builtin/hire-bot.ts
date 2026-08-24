@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { fail, ok, type Skill } from '../skill.js';
+import { fail, ok, unknownSkills, type Skill } from '../skill.js';
 
 const Input = z.object({
   name: z.string().min(1).describe('What the new bot is called, e.g. "Research".'),
@@ -12,6 +12,12 @@ const Input = z.object({
     .array(z.string())
     .default([])
     .describe('Project folders they may work in, besides their own.'),
+  skills: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'What they are allowed to use. Leave this out to give them everything, or list only what the job needs. Run list_bots to see the choices.',
+    ),
 });
 
 export const hireBotSkill: Skill<z.infer<typeof Input>> = {
@@ -25,11 +31,16 @@ export const hireBotSkill: Skill<z.infer<typeof Input>> = {
     if (ctx.host.getAgent(input.name)) {
       return fail(`There is already a bot called "${input.name}". Pick another name.`);
     }
+    if (input.skills) {
+      const problem = unknownSkills(input.skills, ctx.host);
+      if (problem) return fail(problem);
+    }
     const created = await ctx.host.createAgent({
       name: input.name,
       role: input.role,
       instructions: input.instructions,
       sharedWorkspaces: input.sharedWorkspaces,
+      ...(input.skills ? { skills: input.skills } : {}),
       createdBy: ctx.agent.id,
     });
     return ok(

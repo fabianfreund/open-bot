@@ -19,6 +19,12 @@ export const TracePartSchema = z.object({
   title: z.string(),
   detail: z.string().optional(),
   status: z.enum(['in-progress', 'completed', 'failed']).default('completed'),
+  /**
+   * How much of the message had been said when this happened, in characters.
+   * Lets the chat show a step where it actually occurred, rather than piling
+   * every step above the answer.
+   */
+  at: z.number().default(0),
 });
 export type TracePart = z.infer<typeof TracePartSchema>;
 
@@ -34,13 +40,6 @@ export const MessageSchema = z.object({
   createdAt: z.string(),
   /** True while the provider is still appending to `body`. */
   streaming: z.boolean().default(false),
-  /**
-   * Set when this message was relayed by a skill, e.g. one agent messaging
-   * another. Lets the UI render "Message from Bagel Social".
-   */
-  relayedFrom: z.string().optional(),
-  usage: z
-    .object({ inputTokens: z.number(), outputTokens: z.number() })
-    .optional(),
+  usage: z.object({ inputTokens: z.number(), outputTokens: z.number() }).optional(),
 });
 export type Message = z.infer<typeof MessageSchema>;

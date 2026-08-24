@@ -53,8 +53,3 @@ export const HealthResponseSchema = z.object({
   projectName: z.string(),
 });
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
-
-export interface ApiError {
-  error: string;
-  detail?: string;
-}

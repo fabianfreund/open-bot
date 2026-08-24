@@ -1,9 +1,13 @@
 import type { Skill } from '../skill.js';
 import { askUserSkill } from './ask-user.js';
+import { changeBotSkill } from './change-bot.js';
 import { hireBotSkill } from './hire-bot.js';
 import { listBotsSkill } from './list-bots.js';
+import { lookBackSkill } from './look-back.js';
 import { messageBotSkill } from './message-bot.js';
 import { rememberSkill } from './remember.js';
+import { retireBotSkill } from './retire-bot.js';
+import { shareLinkSkill } from './share-link.js';
 
 /**
  * Skills that ship with OpenBot. File reading, writing, searching, and running
@@ -15,9 +19,23 @@ import { rememberSkill } from './remember.js';
 export const builtinSkills: Skill<any>[] = [
   listBotsSkill,
   hireBotSkill,
+  changeBotSkill,
+  retireBotSkill,
   messageBotSkill,
   askUserSkill,
+  shareLinkSkill,
+  lookBackSkill,
   rememberSkill,
 ];
 
-export { listBotsSkill, hireBotSkill, messageBotSkill, askUserSkill, rememberSkill };
+export {
+  listBotsSkill,
+  hireBotSkill,
+  changeBotSkill,
+  retireBotSkill,
+  messageBotSkill,
+  askUserSkill,
+  shareLinkSkill,
+  lookBackSkill,
+  rememberSkill,
+};

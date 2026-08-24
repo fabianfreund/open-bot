@@ -11,6 +11,13 @@ export const ProjectSettingsSchema = z.object({
   bindHost: z.string().default('127.0.0.1'),
   /** How the human is addressed in prompts and message authorship. */
   userName: z.string().default('You'),
+  /**
+   * How long a bot keeps a chat in mind after the last message. Once a chat
+   * goes quiet the session ends: the provider thread is dropped, the bot shows
+   * as offline, and the next message starts a fresh one. Nothing is lost, and
+   * long-idle chats stop carrying context nobody is using.
+   */
+  sessionMinutes: z.number().int().min(5).default(60),
 });
 export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>;
 

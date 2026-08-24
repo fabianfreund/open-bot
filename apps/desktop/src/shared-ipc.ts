@@ -53,6 +53,9 @@ export interface OpenBotBridge {
   /** Lets the host share its address so another device can pair. */
   shareInvite(): Promise<{ url: string; token: string } | null>;
   revealProject(path: string): Promise<void>;
+  /** Opens a web address, a file, or a folder with whatever the OS uses for it. */
+  openTarget(target: string): Promise<void>;
+  copyText(text: string): Promise<void>;
   /**
    * Fires whenever the hosted project changes, including when it stops. The
    * window follows the host rather than holding a connection that has moved.

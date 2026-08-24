@@ -5,7 +5,9 @@
   "description": "Self-hosted agent team you chat with. Electron app + local server.",
   "license": "MIT",
   "type": "module",
-  "engines": { "node": ">=20.11" },
+  "engines": {
+    "node": ">=20.11"
+  },
   "packageManager": "pnpm@9.15.2",
   "scripts": {
     "build": "pnpm -r --filter \"./packages/**\" run build",

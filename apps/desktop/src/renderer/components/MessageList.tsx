@@ -1,16 +1,15 @@
 import { useEffect, useRef } from 'react';
-import type { AgentView, Card, Message } from '@openbot/shared';
+import type { Card, Message, TracePart } from '@openbot/shared';
 import { CardList } from './cards/index.js';
 import { Markdown } from './Markdown.js';
 import { TraceList } from './TraceList.js';
 
 interface Props {
   messages: Message[];
-  agents: AgentView[];
   onAnswerCard(message: Message, card: Card, answer: string): void;
 }
 
-export function MessageList({ messages, agents, onAnswerCard }: Props) {
+export function MessageList({ messages, onAnswerCard }: Props) {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -21,10 +20,9 @@ export function MessageList({ messages, agents, onAnswerCard }: Props) {
     <div className="flex-1 overflow-y-auto px-6 py-5">
       <div className="mx-auto flex max-w-[720px] flex-col gap-3">
         {messages.map((message, index) => (
-          <Bubble
+          <MessageBlocks
             key={message.id}
             message={message}
-            agents={agents}
             showDay={showDay(messages, index)}
             onAnswerCard={onAnswerCard}
           />
@@ -35,21 +33,19 @@ export function MessageList({ messages, agents, onAnswerCard }: Props) {
   );
 }
 
-function Bubble({
+function MessageBlocks({
   message,
-  agents,
   showDay,
   onAnswerCard,
 }: {
   message: Message;
-  agents: AgentView[];
   showDay: boolean;
   onAnswerCard(message: Message, card: Card, answer: string): void;
 }) {
   const mine = message.author.kind === 'user';
-  const relayed = message.relayedFrom;
-  const color =
-    agents.find((a) => a.definition.id === message.author.id)?.definition.avatar.color ?? '#8a8a93';
+  const blocks = mine ? [{ kind: 'text' as const, text: message.body }] : split(message);
+  const last = blocks.filter((b) => b.kind === 'text').at(-1);
+  const empty = blocks.every((b) => b.kind !== 'text');
 
   return (
     <>
@@ -58,31 +54,82 @@ function Bubble({
           {dayLabel(message.createdAt)}
         </div>
       )}
-      {relayed && (
-        <div className="mt-1 text-right text-[11px] text-[var(--color-muted)]">
-          Message from <span style={{ color }}>{relayed}</span>
-        </div>
+      {blocks.map((block, index) =>
+        block.kind === 'steps' ? (
+          <TraceList key={index} parts={block.parts} />
+        ) : (
+          <Bubble key={index} mine={mine}>
+            <Markdown text={block.text} />
+            {block === last && (
+              <CardList
+                cards={message.cards}
+                onAnswer={(card, answer) => onAnswerCard(message, card, answer)}
+              />
+            )}
+          </Bubble>
+        ),
       )}
-      <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-        <div
-          className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13.5px] ${
-            mine ? 'bg-[#2f6fd0] text-white' : 'bg-[var(--color-raised)]'
-          }`}
-        >
-          {!mine && <TraceList parts={message.parts} />}
-          {message.body ? (
-            <Markdown text={message.body} />
-          ) : (
-            message.streaming && <Typing />
-          )}
+      {empty && (message.cards.length > 0 || message.streaming) && (
+        <Bubble mine={mine}>
+          {message.streaming && message.cards.length === 0 && <Typing />}
           <CardList
             cards={message.cards}
             onAnswer={(card, answer) => onAnswerCard(message, card, answer)}
           />
-        </div>
-      </div>
+        </Bubble>
+      )}
     </>
   );
+}
+
+function Bubble({ mine, children }: { mine: boolean; children: React.ReactNode }) {
+  return (
+    <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13.5px] ${
+          mine ? 'bg-[#2f6fd0] text-white' : 'bg-[var(--color-raised)]'
+        }`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+type Block = { kind: 'text'; text: string } | { kind: 'steps'; parts: TracePart[] };
+
+/**
+ * What the bot is thinking is a step like any other, but only while it is
+ * still going. Once it has answered, the answer is the point.
+ */
+function steps(message: Message): TracePart[] {
+  const done = message.parts.filter((p) => p.kind !== 'reasoning');
+  if (!message.streaming) return done;
+  const thinking = message.parts.filter((p) => p.kind === 'reasoning').at(-1);
+  return thinking ? [...done, { ...thinking, status: 'in-progress' as const }] : done;
+}
+
+/**
+ * Puts what the bot did back where it happened: the text it had said by then,
+ * then the steps, then the rest. Steps sit outside the bubbles. Messages from
+ * before steps were placed have no position, so they all land at the top.
+ */
+function split(message: Message): Block[] {
+  const parts = steps(message);
+  const place = (part: TracePart) => Math.min(part.at ?? 0, message.body.length);
+  const blocks: Block[] = [];
+  const points = [...new Set(parts.map(place))].sort((a, b) => a - b);
+
+  let cursor = 0;
+  for (const point of points) {
+    const text = message.body.slice(cursor, point).trim();
+    if (text) blocks.push({ kind: 'text', text });
+    cursor = Math.max(cursor, point);
+    blocks.push({ kind: 'steps', parts: parts.filter((p) => place(p) === point) });
+  }
+  const rest = message.body.slice(cursor).trim();
+  if (rest) blocks.push({ kind: 'text', text: rest });
+  return blocks;
 }
 
 function Typing() {

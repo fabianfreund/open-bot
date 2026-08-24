@@ -25,7 +25,10 @@ export class ConfigStore {
 
   async load(): Promise<AppConfig> {
     try {
-      this.#cache = { ...EMPTY, ...(JSON.parse(await fs.readFile(this.#file, 'utf8')) as AppConfig) };
+      this.#cache = {
+        ...EMPTY,
+        ...(JSON.parse(await fs.readFile(this.#file, 'utf8')) as AppConfig),
+      };
     } catch {
       this.#cache = EMPTY;
     }

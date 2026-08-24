@@ -10,7 +10,9 @@ function readStored(): Theme | undefined {
 }
 
 function readInitial(): Theme {
-  return readStored() ?? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  return (
+    readStored() ?? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+  );
 }
 
 function apply(theme: Theme) {

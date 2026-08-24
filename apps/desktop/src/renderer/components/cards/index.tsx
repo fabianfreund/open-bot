@@ -1,4 +1,5 @@
 import type { Card } from '@openbot/shared';
+import { LinkCard } from './LinkCard.js';
 import { QuestionCard } from './QuestionCard.js';
 import type { CardComponent, CardProps } from './types.js';
 
@@ -11,6 +12,7 @@ import type { CardComponent, CardProps } from './types.js';
  */
 const REGISTRY: Record<string, CardComponent> = {
   question: QuestionCard,
+  link: LinkCard,
 };
 
 export function CardList({
@@ -27,7 +29,9 @@ export function CardList({
         const Component = REGISTRY[card.type];
         // An older app can still show a card it does not know how to render.
         if (!Component) return null;
-        return <Component key={card.id} card={card} onAnswer={(answer) => onAnswer(card, answer)} />;
+        return (
+          <Component key={card.id} card={card} onAnswer={(answer) => onAnswer(card, answer)} />
+        );
       })}
     </>
   );

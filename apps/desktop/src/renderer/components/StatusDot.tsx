@@ -1,18 +1,35 @@
 import type { AgentStatus } from '@openbot/shared';
+import {
+  STATUS_ERROR,
+  STATUS_IDLE,
+  STATUS_INFO,
+  STATUS_OK,
+  STATUS_WARN,
+} from '../status-colors.js';
 
+/**
+ * Green is there and free. Grey is still on the team, but not holding this
+ * chat in mind until you say something.
+ */
 const COLOR: Record<AgentStatus, string> = {
-  idle: 'transparent',
-  thinking: '#4f8ef7',
-  working: '#e0a13a',
-  'waiting-on-user': '#2fb673',
-  error: '#e0574a',
+  offline: STATUS_IDLE,
+  idle: STATUS_OK,
+  thinking: STATUS_INFO,
+  working: STATUS_WARN,
+  'waiting-on-user': STATUS_OK,
+  error: STATUS_ERROR,
 };
 
-export function StatusDot({ status }: { status: AgentStatus }) {
-  if (status === 'idle') return null;
+export function StatusDot({
+  status,
+  className = 'size-2',
+}: {
+  status: AgentStatus;
+  className?: string;
+}) {
   return (
     <span
-      className="size-2 rounded-full"
+      className={`${className} rounded-full`}
       style={{ background: COLOR[status] }}
       aria-label={status}
     />

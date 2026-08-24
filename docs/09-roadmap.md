@@ -8,23 +8,24 @@
 - Turn loop with per-conversation queueing, streaming, and abort
 - Codex provider on a ChatGPT subscription, with resumable threads
 - Echo provider for offline UI work
-- Skills: `list_bots`, `hire_bot`, `message_bot`, `ask_user`, `remember`
+- Skills: `list_bots`, `hire_bot`, `change_bot`, `retire_bot`, `message_bot`,
+  `ask_user`, `share_link`, `look_back`, `remember`
 - MCP bridge exposing skills to Codex, with per-agent allow-lists
-- Delegation with reply relay, depth and deadlock guards
+- Delegation that reports back to the asking bot, with depth and deadlock guards
 - HTTP + WebSocket API with token auth
 - Electron app: onboarding, sidebar, chat, streaming, trace, hiring
 - Onboarding bot that greets you and interviews you
 - Inline cards, with a question card and a renderer registry
+- Unread counts per bot, badged in the sidebar and sorted to the top
 
 Verified end to end against real Codex turns: tool discovery, `list_bots`,
-`message_bot` with a relayed reply, and `ask_user` producing a card the model
-composed itself.
+`message_bot` with a reply handed back to the asking bot, and `ask_user`
+producing a card the model composed itself.
 
 ## Next
 
 **Make the team feel alive**
 
-- Unread counts and a badge per bot (`AgentView.unread` is plumbed, always 0)
 - Notifications when a bot messages you while the app is in the background
 - A bot that starts work on a schedule rather than only when spoken to
 
@@ -61,9 +62,9 @@ composed itself.
 
 ## Open questions
 
-- **Should a relayed answer wake the bot that asked?** Today it lands in the
-  chat and stops, so you decide what happens next. Automatic continuation is
-  more useful and much easier to run away with.
+- **How far should an answer carry?** A colleague's reply now wakes the bot
+  that asked, which continues on its own. The depth cap is the only brake, and
+  it may want a better one.
 - **Where do skills come from?** Built-in today. A plugin folder inside the
   project would let a team carry its own, at the cost of running code from a
   project folder.
