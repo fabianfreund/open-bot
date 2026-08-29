@@ -2,6 +2,7 @@ import type { AgentDefinition, AgentStatus, AgentView } from './models/agent.js'
 import type { Conversation } from './models/conversation.js';
 import type { Message } from './models/message.js';
 import type { ProjectInfo } from './models/project.js';
+import type { SkillInfo } from './models/skill.js';
 
 /**
  * Everything the server pushes to connected clients. One union, one socket.
@@ -17,7 +18,8 @@ export type ServerEvent =
   | { type: 'conversation.updated'; conversation: Conversation }
   | { type: 'message.created'; message: Message }
   | { type: 'message.updated'; message: Message }
-  | { type: 'notice'; level: 'info' | 'warn' | 'error'; text: string };
+  | { type: 'notice'; level: 'info' | 'warn' | 'error'; text: string }
+  | { type: 'skills.updated'; skills: SkillInfo[] };
 
 /** Anything a client sends up the socket. Most writes go over REST instead. */
 export type ClientEvent = { type: 'ping' } | { type: 'read'; conversationId: string };

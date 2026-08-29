@@ -95,15 +95,17 @@ decided by OpenBot's skill allow-list and the Codex sandbox, not by prompts.
 
 When Chief of Staff messages Social:
 
-1. A channel conversation `a2a.<a>.<b>` is created if it does not exist.
-2. The request is appended to that channel, authored by Chief of Staff.
-3. Social runs a turn in the channel, in its own thread and its own workspace.
-4. Social's answer goes back to Chief of Staff, which runs another turn in the
-   conversation it asked from and speaks there in its own voice.
+1. A channel `a2a.<a>.<b>` logs the request (for `look_back`), authored by
+   Chief of Staff.
+2. Social runs the turn in Social's own chat with the person. Tool calls and
+   steps show there as Social works.
+3. Social's answer is logged on the channel, then wakes Chief of Staff, which
+   speaks in its own chat in its own voice.
 
 Social never posts into a chat the person opened with Chief of Staff. A chat
 with one bot only ever contains that bot. If Social needs the person, it uses
-`ask_user`, which lands in Social's own chat.
+`ask_user`, which lands in Social's own chat. The store refuses any other
+bot writing there.
 
 Two guards keep this from running away:
 
@@ -117,10 +119,13 @@ means a slow colleague never blocks a chat.
 
 ## What a bot remembers
 
-Three different lifetimes, and it matters which is which:
+Four different lifetimes, and it matters which is which:
 
 - **History** is forever. `.openbot/messages/<conversation>.jsonl` is appended
   to and never trimmed. Nothing here is ever deleted.
+- **Team notes** are forever and shared. `memory/notes.db` holds what the team
+  decided and learned, one sentence per note, readable by every bot. Chats are
+  per bot; notes are the team's.
 - **The provider thread** is not. Codex holds the live context behind a thread
   id in `conversation.providerThreads[agentId]`. That thread is dropped when a
   bot is renamed or rebriefed, because it carries the old brief with it.
@@ -143,6 +148,36 @@ That last part is the whole design: a bot is never quietly missing something.
 When the recap is short it says so, and `look_back` searches every message in
 every chat that bot has been part of, retired colleagues included.
 
+## The team notes
+
+`look_back` searches what was said. The notes hold what was settled, and they
+are shared, so something one bot worked out is something every bot knows.
+
+A note is a date, one sentence, some tags, and a longer body only when the
+sentence genuinely leaves something out. That shape is the point: `recall`
+returns thirty notes for the price of a paragraph, marking which ones have a
+body worth fetching, and `read_notes` fetches every body a bot decided it needs
+in a single call. Memory that grows for years without growing what a turn
+costs.
+
+**A bot never writes a note itself.** `remember` hands the text to a librarian:
+a one-shot model run with no tools, no thread, and no memory of its own, which
+sees every summary already on file and answers with one of three verdicts.
+
+- `keep`, with a sentence and tags of its own wording
+- `update`, when this corrects a note already on file
+- `skip`, when it is progress, a restatement of a brief, or already covered
+
+The verdict goes back to the bot inside its own turn, so a bot that writes down
+what it is about to do next is told so, and learns. If the librarian is
+unavailable or answers with something that is not a verdict, the note is kept
+as the bot wrote it. Nothing a bot asked to keep is ever lost to a failure
+upstream.
+
+Correcting a note writes a new one and points the old one at it. Superseded
+notes drop out of search and stay in the file, so a decision that changed can
+still be traced.
+
 ## Leaving the team
 
 Nothing is deleted, ever. `retire_bot` (or `DELETE /api/agents/:id`) sets
@@ -157,21 +192,36 @@ Nothing archives a bot on its own. It only happens when someone asks.
 
 ## Extension points
 
-Four, all the same shape. Each is a registry you add to.
+Each is a registry you add to.
 
 | To add               | Write                 | Register in                           |
 | -------------------- | --------------------- | ------------------------------------- |
-| A model backend      | a `Provider`          | `OpenBotRuntime.open`                 |
-| A capability         | a `Skill`             | `skills/builtin/index.ts`             |
+| A model backend      | a `Provider`          | `providers/index.ts`                  |
+| A capability         | a `Skill`, or a folder in `tools/` | `skills/builtin/index.ts` (builtin) or `tools/<name>/TOOL.md` (this team) |
 | An inline chat block | a card component      | `renderer/components/cards/index.tsx` |
+| A file type          | a `FileKind`          | `shared/models/file.ts` (and a preview in `renderer/components/attachments/` if it should look different) |
 | A storage layout     | change `ProjectPaths` | one file                              |
 
-## Why files and not a database
+The turn loop is the same shape. `turns/scheduler.ts` decides when work runs (one conversation, one bot, abort, close). `turns/loop.ts` is one provider call. `turns/delegate.ts` is how a bot asks a colleague. Changing the flow means those files, not `runtime.ts`.
+
+## Why files, and the one place that is a database
 
 A project is JSON and JSONL on disk. Message history appends; the project
 manifest is written whole with write-then-rename so a crash cannot truncate it.
 
-This is a deliberate trade. It means no native modules in Electron, a project
-folder you can read, diff, back up, and put in git, and no migration story for
-an early project. If message volume ever makes this the bottleneck, the store
-is behind `ConversationStore` and can be swapped without touching the runtime.
+This is a deliberate trade. It means a project folder you can read, diff, back
+up, and put in git, and no migration story for an early project. If message
+volume ever makes this the bottleneck, the store is behind `ConversationStore`
+and can be swapped without touching the runtime.
+
+The team notes are the exception, and only because the access pattern is
+genuinely a query: search these words, with these tags, in this date range,
+ranked. Doing that over a folder of markdown means reading every file into
+memory on every call, which is exactly the cost the notes exist to avoid.
+
+`memory/notes.db` is SQLite through `node:sqlite`, which ships inside Node and
+inside Electron. No native module, nothing to rebuild per platform, nothing
+extra to package. The trade is a binary file in an otherwise readable folder,
+so every write also regenerates `memory/notes.md`: the same one-way
+relationship `AGENTS.md` has with `agent.json`. The database is the store, the
+markdown is the copy you can read and diff.

@@ -61,4 +61,8 @@ export interface Provider {
   run(input: ProviderRunInput, context: ProviderContext): Promise<ProviderRunResult>;
   /** Reports whether the provider is usable, e.g. whether Codex is signed in. */
   health(): Promise<ProviderHealth>;
+  /** Chat-facing text for a thrown error. The runner never learns the backend. */
+  mapError?(err: unknown): string;
+  /** Drops a cached backend session when a thread is forgotten or the team closes. */
+  release?(agentId?: string, conversationId?: string): void;
 }

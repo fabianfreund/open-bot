@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { ChatPane } from './components/ChatPane.js';
 import { NewBotDialog } from './components/NewBotDialog.js';
-import { Onboarding } from './components/Onboarding.js';
-import { SettingsDialog } from './components/SettingsDialog.js';
+import { Onboarding } from './components/home/Onboarding.js';
+import { SettingsPage } from './components/settings/SettingsPage.js';
 import { Sidebar } from './components/Sidebar.js';
+import { armNotify } from './notify.js';
 import { useStore } from './state/store.js';
 
 export function App() {
@@ -12,15 +13,17 @@ export function App() {
   const error = useStore((s) => s.error);
   const init = useStore((s) => s.init);
   const attach = useStore((s) => s.attach);
-  const leave = useStore((s) => s.leave);
   const hireBot = useStore((s) => s.hireBot);
   const setError = useStore((s) => s.setError);
   const markRead = useStore((s) => s.markRead);
+  const view = useStore((s) => s.view);
+  const setView = useStore((s) => s.setView);
 
-  const [dialog, setDialog] = useState<'new-bot' | 'settings' | null>(null);
+  const [hiring, setHiring] = useState(false);
 
   useEffect(() => {
     void init();
+    armNotify();
   }, [init]);
 
   // Coming back to the window counts as reading whatever is on screen.
@@ -37,21 +40,14 @@ export function App() {
   }
 
   return (
-    <div className="flex h-full">
-      <Sidebar onNewBot={() => setDialog('new-bot')} onSettings={() => setDialog('settings')} />
-      <ChatPane />
+    <div className="screen-enter flex h-full">
+      <Sidebar
+        onNewBot={() => setHiring(true)}
+        onSettings={() => setView(view === 'settings' ? 'chat' : 'settings')}
+      />
+      {view === 'settings' ? <SettingsPage connection={connection} /> : <ChatPane />}
 
-      {dialog === 'new-bot' && <NewBotDialog onClose={() => setDialog(null)} onCreate={hireBot} />}
-      {dialog === 'settings' && (
-        <SettingsDialog
-          connection={connection}
-          onClose={() => setDialog(null)}
-          onLeave={() => {
-            setDialog(null);
-            void leave();
-          }}
-        />
-      )}
+      {hiring && <NewBotDialog onClose={() => setHiring(false)} onCreate={hireBot} />}
 
       {error && (
         <button

@@ -1,4 +1,4 @@
-import type { AgentDefinition, Message } from '@openbot/shared';
+import { messageText, type AgentDefinition, type Message } from '@openbot/shared';
 
 const RECAP_LIMIT = 12;
 
@@ -27,7 +27,9 @@ export function buildRecap(history: Message[]): string {
   if (history.length === 0) return '';
   const recent = history.slice(-RECAP_LIMIT);
   const dropped = history.length - recent.length;
-  const lines = recent.map((m) => `${m.author.name}: ${m.body.replace(/\s+/g, ' ').slice(0, 400)}`);
+  const lines = recent.map(
+    (m) => `${m.author.name}: ${messageText(m).replace(/\s+/g, ' ').slice(0, 400)}`,
+  );
   const header =
     dropped > 0
       ? `The last ${recent.length} of ${history.length} messages in this chat. ${dropped} earlier ones are not here; look_back searches them.`

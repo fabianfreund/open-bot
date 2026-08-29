@@ -16,11 +16,17 @@ const Input = z.object({
     .array(z.string())
     .optional()
     .describe('Project folders they may work in, besides their own.'),
-  skills: z
+  tools: z
     .array(z.string())
     .optional()
     .describe(
       'What they are allowed to use. Use ["*"] for everything. Run list_bots to see the choices.',
+    ),
+  pinned: z
+    .boolean()
+    .optional()
+    .describe(
+      "Pin them at the top of the person's list, or unpin them. The manager should stay pinned.",
     ),
 });
 
@@ -28,7 +34,7 @@ export const changeBotSkill: Skill<z.infer<typeof Input>> = {
   id: 'change_bot',
   title: 'Change a bot',
   description:
-    'Rename a colleague, rewrite what they own or how they work, or change what they are allowed to use. Use this instead of hiring a second bot for the same job.',
+    'Rename a colleague, rewrite what they own or how they work, change what they are allowed to use, or pin them at the top of the list. Use this instead of hiring a second bot for the same job.',
   input: Input,
   sensitive: true,
   async run(input, ctx) {
@@ -48,11 +54,11 @@ export const changeBotSkill: Skill<z.infer<typeof Input>> = {
       }
     }
 
-    if (input.skills) {
+    if (input.tools) {
       if (target.id === ctx.agent.id) {
         return fail('You cannot change what you yourself are allowed to use.');
       }
-      const problem = unknownSkills(input.skills, ctx.host);
+      const problem = unknownSkills(input.tools, ctx.host);
       if (problem) return fail(problem);
     }
 
@@ -61,7 +67,8 @@ export const changeBotSkill: Skill<z.infer<typeof Input>> = {
       ...(input.role !== undefined ? { role: input.role } : {}),
       ...(input.instructions !== undefined ? { instructions: input.instructions } : {}),
       ...(input.sharedWorkspaces ? { sharedWorkspaces: input.sharedWorkspaces } : {}),
-      ...(input.skills ? { skills: input.skills } : {}),
+      ...(input.tools ? { skills: input.tools } : {}),
+      ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
     });
 
     const changed = [
@@ -69,7 +76,8 @@ export const changeBotSkill: Skill<z.infer<typeof Input>> = {
       input.role !== undefined ? 'what they own' : '',
       input.instructions !== undefined ? 'their brief' : '',
       input.sharedWorkspaces ? 'their folders' : '',
-      input.skills ? 'what they may use' : '',
+      input.tools ? 'what they may use' : '',
+      input.pinned === true ? 'pinned' : input.pinned === false ? 'unpinned' : '',
     ].filter(Boolean);
 
     return changed.length === 0

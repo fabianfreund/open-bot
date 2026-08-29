@@ -44,13 +44,17 @@ newsletter".
 ## A new team is never empty
 
 Creating a team immediately hires **Setty**, which introduces itself and asks
-what you need. The greeting and its first question are written in code, not
-generated, so a brand-new project is useful the instant it opens and does not
-depend on a model call succeeding.
+what this is about. The greeting and its first question are written in code,
+not generated, so a brand-new project is useful the instant it opens and does
+not depend on a model call succeeding.
 
-Setty's job is to interview you, hire the rest of the team, and change it later
-when the work changes. At most four bots to start, because a wall of new
-colleagues is not a good first impression.
+Setty's job is to interview you (follow-ups in one card when they belong
+together), set the project up, hire the rest of the team, and change it later
+when the work changes. When the work needs more than one specialist she hires
+a manager, pins them, and finishes by telling you the team is ready: bots are
+on the left, who to open for what, or just talk to the manager. Come back to
+her to change the team. New hires say hello in their own chat. At most four
+bots to start, because a wall of new colleagues is not a good first impression.
 
 ## Bots are colleagues, not commands
 
@@ -67,6 +71,6 @@ clicking the wrong thing.
 
 ## Small files, obvious seams
 
-Every subsystem is a registry you add to: providers, skills, cards, storage
-paths. If adding a feature means editing more than two existing files plus one
-new one, the seam is in the wrong place.
+Every subsystem is a registry you add to: providers, skills, cards, file
+kinds, storage paths. If adding a feature means editing more than two existing
+files plus one new one, the seam is in the wrong place.

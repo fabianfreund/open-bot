@@ -3,6 +3,9 @@ import type {
   AgentDefinition,
   Card,
   CreateAgentRequest,
+  Note,
+  NoteOutcome,
+  NoteQuery,
   SkillInfo,
   SkillResult,
   UpdateAgentRequest,
@@ -32,8 +35,13 @@ export interface SkillHost {
   createAgent(request: CreateAgentRequest): Promise<AgentDefinition>;
   /** Changes a bot that already exists: its name, its brief, what it may use. */
   updateAgent(id: string, patch: UpdateAgentRequest): Promise<AgentDefinition>;
-  /** Every skill that exists, so a bot can see what it may hand out. */
+  /** Every tool that exists, so a bot can see what it may hand out. */
   listSkills(): SkillInfo[];
+  /**
+   * Re-reads `tools/` from disk into the registry. Briefs and the UI pick up
+   * whatever changed. Cheap enough to call before a turn lists its tools.
+   */
+  reloadTools(): Promise<void>;
   /**
    * Sends a message from one agent to another. The recipient answers in its own
    * turn, and the answer goes back to the sender in `originConversationId`,
@@ -47,7 +55,24 @@ export interface SkillHost {
     wait: boolean;
   }): Promise<string | null>;
   /** Posts a message from an agent into the user's chat with that agent. */
-  sendToUser(options: { from: string; text: string; cards?: Card[] }): Promise<void>;
+  sendToUser(options: {
+    from: string;
+    text: string;
+    cards?: Card[];
+    /** False for a hello that is not waiting on a reply. Default true. */
+    waiting?: boolean;
+  }): Promise<void>;
+  /**
+   * After the interview: set what the team is for, write the handbook that
+   * every brief loads, make folders, and write reference files into them.
+   */
+  setupTeam(options: {
+    agentId: string;
+    goal?: string;
+    handbook?: string;
+    folders?: string[];
+    files?: { path: string; content: string }[];
+  }): Promise<{ goal: string; handbook: boolean; folders: string[]; files: string[] }>;
   /** Absolute path to an agent's own workspace. */
   workspaceFor(agentId: string): string;
   /**
@@ -63,6 +88,18 @@ export interface SkillHost {
     until?: string;
     limit: number;
   }): Promise<HistoryHit[]>;
+  /**
+   * Hands text to the librarian, which decides whether the team keeps it.
+   * A skill never writes a note directly; that is what stops the notes filling
+   * up with what each bot happened to be doing that afternoon.
+   */
+  rememberNote(options: { agentId: string; text: string }): Promise<NoteOutcome>;
+  /** Matching notes as summaries. Bodies are fetched one at a time. */
+  recallNotes(query: NoteQuery): Promise<Note[]>;
+  /** Several notes at once, in the order asked for. Missing ids are skipped. */
+  readNotes(ids: number[]): Promise<Note[]>;
+  /** Every tag in use, most used first, so a bot can see how notes are filed. */
+  noteTags(): Promise<string[]>;
 }
 
 export interface SkillContext {
@@ -106,5 +143,5 @@ export function unknownSkills(ids: string[], host: SkillHost): string | null {
   const known = host.listSkills().map((s) => s.id);
   const missing = ids.filter((id) => !known.includes(id));
   if (missing.length === 0) return null;
-  return `No skill called ${missing.join(', ')}. Choose from: ${known.join(', ')}, or "*" for all.`;
+  return `No tool called ${missing.join(', ')}. Choose from: ${known.join(', ')}, or "*" for all.`;
 }

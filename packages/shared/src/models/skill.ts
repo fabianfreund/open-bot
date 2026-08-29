@@ -8,7 +8,7 @@ export const SkillInfoSchema = z.object({
   description: z.string(),
   /** JSON Schema for the skill's input. */
   inputSchema: z.record(z.string(), z.unknown()),
-  /** Where the skill came from: `builtin` or a plugin id. */
+  /** Where the tool came from: `builtin` or `team`. */
   source: z.string().default('builtin'),
   /** Skills that change the team or the outside world; surfaced in the UI. */
   sensitive: z.boolean().default(false),

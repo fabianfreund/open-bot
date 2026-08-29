@@ -3,7 +3,7 @@ import type { AgentDefinition, SkillInfo, SkillResult } from '@openbot/shared';
 import type { Skill, SkillContext } from './skill.js';
 
 /**
- * Holds every registered skill and decides which ones a given agent may call.
+ * Holds every registered tool and decides which ones a given agent may call.
  */
 export class SkillRegistry {
   #skills = new Map<string, Skill<any>>();
@@ -17,6 +17,23 @@ export class SkillRegistry {
 
   registerAll(skills: Skill<any>[], source = 'builtin'): void {
     for (const skill of skills) this.register(skill, source);
+  }
+
+  /**
+   * Drops everything from `source` and registers `skills` in its place.
+   * Ids that already belong to another source are skipped, so a team tool
+   * cannot shadow a builtin.
+   */
+  replaceSource(source: string, skills: Skill<any>[]): void {
+    for (const [id, src] of [...this.#sources]) {
+      if (src !== source) continue;
+      this.#skills.delete(id);
+      this.#sources.delete(id);
+    }
+    for (const skill of skills) {
+      if (this.#skills.has(skill.id)) continue;
+      this.register(skill, source);
+    }
   }
 
   get(id: string): Skill<any> | undefined {
@@ -37,7 +54,7 @@ export class SkillRegistry {
 
   async execute(id: string, rawInput: unknown, context: SkillContext): Promise<SkillResult> {
     const skill = this.#skills.get(id);
-    if (!skill) return { ok: false, content: `There is no skill called "${id}".` };
+    if (!skill) return { ok: false, content: `There is no tool called "${id}".` };
 
     const allowAll = context.agent.skills.includes('*');
     if (!allowAll && !context.agent.skills.includes(id)) {

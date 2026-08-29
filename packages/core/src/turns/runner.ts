@@ -1,6 +1,5 @@
 import {
   MessageSchema,
-  USER_ID,
   newId,
   type AgentDefinition,
   type AgentStatus,
@@ -9,9 +8,9 @@ import {
   type ProviderStreamEvent,
   type TracePart,
 } from '@openbot/shared';
-import type { ConversationStore } from './conversations/conversation-store.js';
-import type { EventBus } from './bus.js';
-import type { Provider, ProviderContext, ProviderRunInput } from './providers/provider.js';
+import type { ConversationStore } from '../conversations/conversation-store.js';
+import type { EventBus } from '../bus.js';
+import type { Provider, ProviderContext, ProviderRunInput } from '../providers/provider.js';
 
 /** How often a streaming message is pushed to clients while it grows. */
 const STREAM_FLUSH_MS = 120;
@@ -141,25 +140,23 @@ export class TurnRunner {
     } catch (err) {
       clearInterval(timer);
       const aborted = signal.aborted;
+      const title = aborted ? undefined : displayError(err, provider.mapError);
       message = {
         ...message,
         streaming: false,
         body: message.body || (aborted ? 'Stopped.' : ''),
-        parts: aborted
-          ? message.parts
-          : upsertPart(
-              message.parts,
-              { id: newId('err'), traceKind: 'error', title: friendlyError(err), status: 'failed' },
-              message.body.length,
-            ),
+        parts:
+          aborted || !title
+            ? message.parts
+            : upsertPart(
+                message.parts,
+                { id: newId('err'), traceKind: 'error', title, status: 'failed' },
+                message.body.length,
+              ),
       };
       await this.deps.conversations.replace(message, true);
       this.deps.bus.emit({ type: 'message.updated', message });
-      this.deps.onStatus(
-        agent.id,
-        aborted ? 'idle' : 'error',
-        aborted ? undefined : friendlyError(err),
-      );
+      this.deps.onStatus(agent.id, aborted ? 'idle' : 'error', aborted ? undefined : title);
       return { message };
     }
   }
@@ -193,18 +190,8 @@ function upsertPart(
 }
 
 /** Provider errors are developer-shaped; the chat is not. */
-function friendlyError(err: unknown): string {
+function displayError(err: unknown, map?: (err: unknown) => string): string {
+  if (map) return map(err);
   const raw = err instanceof Error ? err.message : String(err);
-  if (/not logged in|unauthor|401/i.test(raw)) return 'Not signed in to Codex. Run `codex login`.';
-  if (/Codex is not installed/i.test(raw)) return raw;
-  if (/Unable to locate Codex CLI/i.test(raw)) {
-    return 'Codex is not installed on this computer. Install it, then run `codex login`.';
-  }
-  if (/ENOENT|not found/i.test(raw) && /codex/i.test(raw))
-    return 'Codex is not installed on this computer.';
-  if (/rate limit|429/i.test(raw)) return 'Hit a rate limit. Try again shortly.';
-  if (/usage limit|quota/i.test(raw)) return 'Your Codex usage limit is reached.';
   return raw.split('\n')[0]?.slice(0, 300) ?? 'Something went wrong.';
 }
-
-export { USER_ID };

@@ -14,7 +14,7 @@ export const messageBotSkill: Skill<z.infer<typeof Input>> = {
   id: 'message_bot',
   title: 'Message a colleague',
   description:
-    'Send work to a colleague. Their answer comes back to you, not to the person you are talking to. By default you finish your reply now and pick their answer up when it lands.',
+    'Send work to a colleague. They do it in their own chat. Their answer comes back to you, not into this chat. By default you finish your reply now and pick their answer up when it lands.',
   input: Input,
   sensitive: true,
   async run(input, ctx) {

@@ -24,7 +24,7 @@ find yourself importing across the grain, the code is in the wrong package.
 
 ## Adding things
 
-There are four registries, and almost every feature is one entry in one of
+There are five registries, and almost every feature is one entry in one of
 them. See [docs/02-architecture.md](docs/02-architecture.md#extension-points).
 
 Adding a feature should mean one new file plus at most two edited ones. If it
@@ -46,13 +46,16 @@ means more, the seam is wrong; fix the seam first.
 pnpm install
 pnpm build          # packages only
 pnpm typecheck      # packages + desktop
+pnpm test           # turn loop, team notes, team tools, and files, in core
 pnpm dev            # build packages, then run the app
 pnpm serve <path>   # headless server for a project
 ```
 
 ## Testing a change end to end
 
-There is no test suite yet. Until there is, verify against a real project:
+`pnpm test` covers the turn loop (queue, abort, delegation, echo) and the team
+notes (search, tags, superseding, and the librarian, with a stub provider). For
+the rest, verify against a real project:
 
 ```bash
 node -e "…"   # see the scripts in docs, or write a throwaway in /tmp
@@ -80,6 +83,11 @@ CORS. Test both.
 - **Codex model names** are not validated by us. A model your ChatGPT plan
   cannot use fails with a 400 from the API, mid-turn. This is why a new project
   names no model at all. Do not add a default back.
+- **SQLite is `node:sqlite`, not a package.** The team notes are the one thing
+  in a project that is a database, and it is the builtin, so there is no native
+  module to rebuild per platform and nothing extra to bundle. Do not add
+  `better-sqlite3`. If a query needs a shape the builtin cannot do, that is a
+  signal about the query.
 - **Bundling breaks runtime path resolution.** Anything that resolves its own
   location with `require.resolve` or `import.meta.url` is wrong once rolldown
   inlines it into `out/main/index.js`. The Codex SDK does exactly this; see

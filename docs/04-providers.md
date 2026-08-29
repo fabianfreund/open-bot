@@ -40,7 +40,7 @@ What it configures per turn:
 | Setting                 | Value                          | Why                                        |
 | ----------------------- | ------------------------------ | ------------------------------------------ |
 | `workingDirectory`      | the bot's workspace            | Its own folder, and where its brief lives  |
-| `additionalDirectories` | its shared workspaces          | Only what it has been granted              |
+| `additionalDirectories` | tools, inbox, shared workspaces | Team tools, dropped files, and what it has been granted |
 | `sandboxMode`           | from `agent.workspace.sandbox` | Default `workspace-write`                  |
 | `approvalPolicy`        | `never`                        | Nobody is watching a terminal              |
 | `skipGitRepoCheck`      | `true`                         | A project folder is not necessarily a repo |
@@ -76,11 +76,7 @@ your plan.
 
 1. Create `packages/core/src/providers/<name>/<name>-provider.ts`.
 2. Implement `Provider`. Map your backend's stream onto `ProviderStreamEvent`.
-3. Register it in `OpenBotRuntime.open`:
-
-```ts
-runtime.providers.register(new ClaudeProvider());
-```
+3. Add it to the array in `providers/index.ts`.
 
 4. Set `provider` on a bot, or change `defaults.provider` in `openbot.json`.
 

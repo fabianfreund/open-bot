@@ -1,4 +1,5 @@
 import type { AgentStatus } from '@openbot/shared';
+import { busy } from '../status-labels.js';
 import {
   STATUS_ERROR,
   STATUS_IDLE,
@@ -27,10 +28,12 @@ export function StatusDot({
   status: AgentStatus;
   className?: string;
 }) {
+  // The colour lives in a variable so the pulse can fade the fill on its own,
+  // leaving the ring around it solid.
   return (
     <span
-      className={`${className} rounded-full`}
-      style={{ background: COLOR[status] }}
+      className={`${className} rounded-full bg-[var(--dot)] ${busy(status) ? 'status-pulse' : ''}`}
+      style={{ '--dot': COLOR[status] } as React.CSSProperties}
       aria-label={status}
     />
   );

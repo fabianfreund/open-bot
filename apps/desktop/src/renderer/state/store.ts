@@ -1,9 +1,22 @@
 import { create } from 'zustand';
 import { EventStream, OpenBotClient } from '@openbot/client';
-import type { AgentView, Card, Message, ServerEvent } from '@openbot/shared';
+import type {
+  AgentView,
+  Card,
+  Message,
+  ProjectInfo,
+  ServerEvent,
+  SkillInfo,
+  UpdateAgentRequest,
+  UpdateProjectRequest,
+} from '@openbot/shared';
 import type { Bootstrap, Connection } from '../../shared-ipc.js';
+import { notifyIfNewMessage } from '../notify.js';
 
 type LinkStatus = 'connecting' | 'open' | 'closed';
+
+/** What fills the pane next to the bot list. */
+export type View = 'chat' | 'settings';
 
 interface State {
   bootstrap?: Bootstrap;
@@ -20,22 +33,34 @@ interface State {
    */
   attachKey?: string;
   agents: AgentView[];
+  /** The team as it is on disk: name, goal, folder, settings. */
+  project?: ProjectInfo;
+  /** Every tool the team has, however it got registered. */
+  skills: SkillInfo[];
+  view: View;
   activeAgentId?: string;
   conversationId?: string;
   messages: Message[];
   error?: string;
 
   init(): Promise<void>;
+  setView(view: View): void;
   attach(connection: Connection): Promise<void>;
   reset(): Promise<void>;
   leave(): Promise<void>;
   selectAgent(agentId: string): Promise<void>;
   /** Clears the unread badge for whichever chat is open. */
   markRead(): Promise<void>;
-  sendMessage(text: string): Promise<void>;
+  /** Clears the unread badge for one bot without opening their chat. */
+  markAgentRead(agentId: string): Promise<void>;
+  sendMessage(text: string, files?: File[]): Promise<void>;
   stop(): Promise<void>;
   answerCard(message: Message, card: Card, answer: string): Promise<void>;
   hireBot(input: { name: string; role: string; instructions: string }): Promise<void>;
+  changeBot(agentId: string, patch: UpdateAgentRequest): Promise<void>;
+  /** Takes a bot off the team. Its folder and its chats stay. */
+  retireBot(agentId: string): Promise<void>;
+  saveProject(patch: UpdateProjectRequest): Promise<void>;
   setError(message?: string): void;
   handleFailure(err: unknown): void;
 }
@@ -43,6 +68,8 @@ interface State {
 export const useStore = create<State>((set, get) => ({
   link: 'closed',
   agents: [],
+  skills: [],
+  view: 'chat',
   messages: [],
 
   async init() {
@@ -62,6 +89,10 @@ export const useStore = create<State>((set, get) => ({
     if (bootstrap.connection) await get().attach(bootstrap.connection);
   },
 
+  setView(view) {
+    set({ view });
+  },
+
   /** Drops the current connection and returns to the first screen. */
   async reset() {
     get().stream?.close();
@@ -72,6 +103,9 @@ export const useStore = create<State>((set, get) => ({
       client: undefined,
       stream: undefined,
       agents: [],
+      project: undefined,
+      skills: [],
+      view: 'chat',
       messages: [],
       activeAgentId: undefined,
       conversationId: undefined,
@@ -88,7 +122,11 @@ export const useStore = create<State>((set, get) => ({
     set({ attachKey: key });
     get().stream?.close();
     const client = new OpenBotClient({ baseUrl: connection.baseUrl, token: connection.token });
-    const agents = await client.agents();
+    const [agents, project, skills] = await Promise.all([
+      client.agents(),
+      client.project(),
+      client.skills(),
+    ]);
 
     // Something else took over while we were fetching; drop this attempt.
     if (get().attachKey !== key) return;
@@ -99,7 +137,7 @@ export const useStore = create<State>((set, get) => ({
       onUnauthorized: () => void get().init(),
     });
 
-    set({ connection, client, stream, agents, error: undefined });
+    set({ connection, client, stream, agents, project, skills, error: undefined });
     const first = agents[0];
     if (first) await get().selectAgent(first.definition.id);
   },
@@ -112,6 +150,9 @@ export const useStore = create<State>((set, get) => ({
       client: undefined,
       stream: undefined,
       agents: [],
+      project: undefined,
+      skills: [],
+      view: 'chat',
       messages: [],
       activeAgentId: undefined,
       conversationId: undefined,
@@ -124,7 +165,8 @@ export const useStore = create<State>((set, get) => ({
   async selectAgent(agentId) {
     const client = get().client;
     if (!client) return;
-    set({ activeAgentId: agentId, messages: [] });
+    // Opening a chat is how you leave settings.
+    set({ activeAgentId: agentId, messages: [], view: 'chat' });
     const conversation = await client.conversationFor(agentId);
     const messages = await client.messages(conversation.id);
     // Guard against a slower fetch landing after the user moved on.
@@ -144,13 +186,31 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
-  async sendMessage(text) {
-    const { client, conversationId } = get();
-    if (!client || !conversationId || !text.trim()) return;
+  async markAgentRead(agentId) {
+    const { client, agents } = get();
+    const agent = agents.find((a) => a.definition.id === agentId);
+    if (!client || !agent?.unread) return;
     try {
-      await client.send(conversationId, text.trim());
+      const conversation = await client.conversationFor(agentId);
+      await client.markRead(conversation.id);
+    } catch {
+      // The badge clears on the next look.
+    }
+  },
+
+  async sendMessage(text, files = []) {
+    const { client, conversationId } = get();
+    if (!client || !conversationId) return;
+    if (!text.trim() && files.length === 0) return;
+    try {
+      const attachments = [];
+      for (const file of files) {
+        attachments.push(await client.upload(file, file.name || 'file'));
+      }
+      await client.send(conversationId, text.trim(), attachments);
     } catch (err) {
       get().handleFailure(err);
+      throw err;
     }
   },
 
@@ -176,6 +236,51 @@ export const useStore = create<State>((set, get) => ({
     await get().selectAgent(agent.id);
   },
 
+  async changeBot(agentId, patch) {
+    const client = get().client;
+    if (!client) return;
+    try {
+      // The list catches up from the `agent.updated` event the save emits.
+      await client.updateAgent(agentId, patch);
+    } catch (err) {
+      get().handleFailure(err);
+    }
+  },
+
+  async retireBot(agentId) {
+    const client = get().client;
+    if (!client) return;
+    try {
+      await client.updateAgent(agentId, { archived: true });
+    } catch (err) {
+      get().handleFailure(err);
+      return;
+    }
+    // Whoever is left takes over the chat pane, so nothing points at a bot
+    // that is no longer on the team.
+    if (get().activeAgentId === agentId) {
+      const next = get().agents.find((a) => a.definition.id !== agentId);
+      if (next) {
+        const view = get().view;
+        await get().selectAgent(next.definition.id);
+        set({ view });
+      } else {
+        set({ activeAgentId: undefined, conversationId: undefined, messages: [] });
+      }
+    }
+  },
+
+  async saveProject(patch) {
+    const client = get().client;
+    if (!client) return;
+    try {
+      const project = await client.updateProject(patch);
+      set({ project });
+    } catch (err) {
+      get().handleFailure(err);
+    }
+  },
+
   setError(message) {
     set({ error: message });
   },
@@ -199,7 +304,10 @@ type Getter = () => State;
 function applyEvent(event: ServerEvent, set: Setter, get: Getter): void {
   switch (event.type) {
     case 'hello':
-      set({ agents: event.agents });
+      set({ agents: event.agents, project: event.project });
+      break;
+    case 'project.updated':
+      set({ project: event.project });
       break;
     case 'agent.created':
       set((state) => ({ agents: [...state.agents, event.agent] }));
@@ -223,25 +331,31 @@ function applyEvent(event: ServerEvent, set: Setter, get: Getter): void {
         ),
       }));
       break;
-    case 'conversation.updated':
-      set((state) => ({
-        agents: state.agents.map((a) =>
-          a.definition.id === event.conversation.agentId
-            ? {
-                ...a,
-                unread: event.conversation.unread,
-                lastMessageAt: event.conversation.lastMessageAt,
-                lastMessagePreview: event.conversation.lastMessagePreview,
-              }
-            : a,
-        ),
-      }));
+    case 'conversation.updated': {
+      // Channels are colleague-to-colleague. Their preview and unread must
+      // not overwrite the person's chat with that bot.
+      if (event.conversation.kind === 'dm') {
+        set((state) => ({
+          agents: state.agents.map((a) =>
+            a.definition.id === event.conversation.agentId
+              ? {
+                  ...a,
+                  unread: event.conversation.unread,
+                  lastMessageAt: event.conversation.lastMessageAt,
+                  lastMessagePreview: event.conversation.lastMessagePreview,
+                }
+              : a,
+          ),
+        }));
+      }
       // Reading it while looking at it is the same as having read it.
       if (event.conversation.id === get().conversationId && document.hasFocus()) {
         void get().markRead();
       }
       break;
+    }
     case 'message.created': {
+      notifyIfNewMessage(event.message);
       if (event.message.conversationId !== get().conversationId) break;
       set((state) =>
         state.messages.some((m) => m.id === event.message.id)
@@ -251,6 +365,7 @@ function applyEvent(event: ServerEvent, set: Setter, get: Getter): void {
       break;
     }
     case 'message.updated': {
+      notifyIfNewMessage(event.message);
       if (event.message.conversationId !== get().conversationId) break;
       set((state) => ({
         messages: state.messages.map((m) => (m.id === event.message.id ? event.message : m)),
@@ -259,6 +374,9 @@ function applyEvent(event: ServerEvent, set: Setter, get: Getter): void {
     }
     case 'notice':
       if (event.level === 'error') set({ error: event.text });
+      break;
+    case 'skills.updated':
+      set({ skills: event.skills });
       break;
     default:
       break;

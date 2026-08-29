@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AttachmentSchema } from './file.js';
 import { CardSchema } from './card.js';
 
 export const AuthorSchema = z.object({
@@ -37,9 +38,17 @@ export const MessageSchema = z.object({
   parts: z.array(TracePartSchema).default([]),
   /** Interactive blocks rendered under the text. */
   cards: z.array(CardSchema).default([]),
+  /** Files the person dropped in. Bytes live on disk at each `path`. */
+  attachments: z.array(AttachmentSchema).default([]),
   createdAt: z.string(),
   /** True while the provider is still appending to `body`. */
   streaming: z.boolean().default(false),
   usage: z.object({ inputTokens: z.number(), outputTokens: z.number() }).optional(),
 });
 export type Message = z.infer<typeof MessageSchema>;
+
+/** Body plus filenames, for recap, search, and the sidebar preview. */
+export function messageText(message: Pick<Message, 'body' | 'attachments'>): string {
+  const files = message.attachments.map((a) => a.path).join('\n');
+  return [message.body.trim(), files].filter(Boolean).join('\n');
+}

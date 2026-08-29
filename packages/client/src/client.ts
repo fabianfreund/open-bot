@@ -3,6 +3,7 @@ import {
   HttpError,
   type AgentDefinition,
   type AgentView,
+  type Attachment,
   type Conversation,
   type CreateAgentRequest,
   type HealthResponse,
@@ -12,6 +13,7 @@ import {
   type ProviderInfo,
   type SkillInfo,
   type UpdateAgentRequest,
+  type UpdateProjectRequest,
 } from '@openbot/shared';
 import { EventStream, type EventStreamHandlers } from './stream.js';
 
@@ -41,6 +43,9 @@ export class OpenBotClient {
   project(): Promise<ProjectInfo> {
     return this.#get('/api/project');
   }
+  updateProject(patch: UpdateProjectRequest): Promise<ProjectInfo> {
+    return this.#send('PATCH', '/api/project', patch);
+  }
   agents(): Promise<AgentView[]> {
     return this.#get('/api/agents');
   }
@@ -66,8 +71,29 @@ export class OpenBotClient {
   messages(conversationId: string): Promise<Message[]> {
     return this.#get(`/api/conversations/${conversationId}/messages`);
   }
-  send(conversationId: string, text: string, images: string[] = []): Promise<Message> {
-    return this.#send('POST', `/api/conversations/${conversationId}/messages`, { text, images });
+  send(conversationId: string, text: string, attachments: Attachment[] = []): Promise<Message> {
+    return this.#send('POST', `/api/conversations/${conversationId}/messages`, {
+      text,
+      attachments: attachments.map((file) => file.path),
+    });
+  }
+
+  /** Saves a dropped file into the team folder. */
+  upload(file: Blob, name?: string): Promise<Attachment> {
+    const body = new FormData();
+    const filename = name || (file instanceof File ? file.name : 'file');
+    body.append('file', file, filename);
+    return this.#send('POST', '/api/files', body);
+  }
+
+  /** Bytes of a project file, for previews. */
+  async download(relPath: string): Promise<Blob> {
+    const res = await authedFetch({
+      baseUrl: this.baseUrl,
+      token: this.token,
+      path: `/api/files?path=${encodeURIComponent(relPath)}`,
+    });
+    return res.blob();
   }
   /** Answers an inline card; the reply continues the conversation. */
   answerCard(
@@ -124,6 +150,7 @@ function describe(status: number): string {
   if (status === 401) return 'This app is no longer paired with that team.';
   if (status === 404) return 'That is not there any more.';
   if (status === 409) return 'That is no longer available.';
+  if (status === 413) return 'That file is too large.';
   if (status >= 500) return 'The team\u2019s computer had a problem.';
   return 'That did not work.';
 }

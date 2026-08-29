@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { Card, Message, TracePart } from '@openbot/shared';
+import { AttachmentList } from './attachments/index.js';
 import { CardList } from './cards/index.js';
 import { Markdown } from './Markdown.js';
 import { TraceList } from './TraceList.js';
@@ -45,7 +46,8 @@ function MessageBlocks({
   const mine = message.author.kind === 'user';
   const blocks = mine ? [{ kind: 'text' as const, text: message.body }] : split(message);
   const last = blocks.filter((b) => b.kind === 'text').at(-1);
-  const empty = blocks.every((b) => b.kind !== 'text');
+  const empty =
+    blocks.every((b) => b.kind !== 'text' || !b.text.trim()) && message.attachments.length === 0;
 
   return (
     <>
@@ -59,7 +61,8 @@ function MessageBlocks({
           <TraceList key={index} parts={block.parts} />
         ) : (
           <Bubble key={index} mine={mine}>
-            <Markdown text={block.text} />
+            {block === last && <AttachmentList files={message.attachments} mine={mine} />}
+            {block.text.trim() ? <Markdown text={block.text} /> : null}
             {block === last && (
               <CardList
                 cards={message.cards}
@@ -69,9 +72,12 @@ function MessageBlocks({
           </Bubble>
         ),
       )}
-      {empty && (message.cards.length > 0 || message.streaming) && (
+      {empty && (message.cards.length > 0 || message.streaming || message.attachments.length > 0) && (
         <Bubble mine={mine}>
-          {message.streaming && message.cards.length === 0 && <Typing />}
+          <AttachmentList files={message.attachments} mine={mine} />
+          {message.streaming && message.cards.length === 0 && message.attachments.length === 0 && (
+            <Typing />
+          )}
           <CardList
             cards={message.cards}
             onAnswer={(card, answer) => onAnswerCard(message, card, answer)}
@@ -86,7 +92,7 @@ function Bubble({ mine, children }: { mine: boolean; children: React.ReactNode }
   return (
     <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13.5px] ${
+        className={`max-w-[85%] space-y-2 rounded-2xl px-3.5 py-2.5 text-[13.5px] ${
           mine ? 'bg-[#2f6fd0] text-white' : 'bg-[var(--color-raised)]'
         }`}
       >

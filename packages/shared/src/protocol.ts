@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+/** PATCH /api/project. What the settings page can change about a team. */
+export const UpdateProjectRequestSchema = z.object({
+  name: z.string().min(1).optional(),
+  goal: z.string().optional(),
+  userName: z.string().min(1).optional(),
+  sessionMinutes: z.number().int().min(5).optional(),
+});
+export type UpdateProjectRequest = z.infer<typeof UpdateProjectRequestSchema>;
+
 /** POST /api/agents. The "hire a bot" payload. Deliberately small. */
 export const CreateAgentRequestSchema = z.object({
   name: z.string().min(1),
@@ -13,6 +22,7 @@ export const CreateAgentRequestSchema = z.object({
   sharedWorkspaces: z.array(z.string()).optional(),
   skills: z.array(z.string()).optional(),
   createdBy: z.string().optional(),
+  pinned: z.boolean().optional(),
 });
 export type CreateAgentRequest = z.infer<typeof CreateAgentRequestSchema>;
 
@@ -22,12 +32,16 @@ export const UpdateAgentRequestSchema = CreateAgentRequestSchema.partial().exten
 export type UpdateAgentRequest = z.infer<typeof UpdateAgentRequestSchema>;
 
 /** POST /api/conversations/:id/messages */
-export const SendMessageRequestSchema = z.object({
-  text: z.string().min(1),
-  /** Absolute paths to local images the provider can read. */
-  images: z.array(z.string()).default([]),
-});
-export type SendMessageRequest = z.infer<typeof SendMessageRequestSchema>;
+export const SendMessageRequestSchema = z
+  .object({
+    text: z.string().default(''),
+    /** Project-relative paths of files already saved (usually under `inbox/`). */
+    attachments: z.array(z.string()).default([]),
+  })
+  .refine((value) => value.text.trim().length > 0 || value.attachments.length > 0, {
+    message: 'Nothing to send.',
+  });
+export type SendMessageRequest = z.input<typeof SendMessageRequestSchema>;
 
 /** POST /api/conversations/:id/answer. The person answered an inline card. */
 export const AnswerCardRequestSchema = z.object({

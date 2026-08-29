@@ -1,9 +1,12 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import multipart from '@fastify/multipart';
 import websocket from '@fastify/websocket';
 import type { OpenBotRuntime } from '@openbot/core';
+import { MAX_FILE_BYTES } from '@openbot/shared';
 import { createAuthHook } from './auth.js';
 import { agentRoutes } from './routes/agents.js';
 import { conversationRoutes } from './routes/conversations.js';
+import { fileRoutes, multipartLimits } from './routes/files.js';
 import { projectRoutes } from './routes/project.js';
 import { skillRoutes } from './routes/skills.js';
 import { registerSocket } from './ws.js';
@@ -35,8 +38,9 @@ export async function startServer(options: StartServerOptions): Promise<ServerHa
   const port = options.port ?? settings.port;
   const host = options.host ?? settings.bindHost;
 
-  const app = Fastify({ logger: false, bodyLimit: 16 * 1024 * 1024 });
+  const app = Fastify({ logger: false, bodyLimit: MAX_FILE_BYTES });
   await app.register(websocket);
+  await app.register(multipart, { limits: multipartLimits });
 
   app.addHook('onRequest', createAuthHook(runtime.token));
   // The desktop renderer and any paired device are separate origins.
@@ -51,6 +55,7 @@ export async function startServer(options: StartServerOptions): Promise<ServerHa
   await projectRoutes(app, runtime);
   await agentRoutes(app, runtime);
   await conversationRoutes(app, runtime);
+  await fileRoutes(app, runtime);
   await skillRoutes(app, runtime);
   await registerSocket(app, runtime);
 
@@ -72,7 +77,7 @@ export async function startServer(options: StartServerOptions): Promise<ServerHa
     app,
     url,
     close: async () => {
-      runtime.close();
+      await runtime.close();
       await app.close();
     },
   };

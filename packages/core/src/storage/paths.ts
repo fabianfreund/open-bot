@@ -1,12 +1,14 @@
 import path from 'node:path';
-import { PROJECT_FILE_NAME, RUNTIME_DIR } from '@openbot/shared';
+import { INBOX_DIR, PROJECT_FILE_NAME, RUNTIME_DIR } from '@openbot/shared';
 
 /**
  * Every path in a project derives from here. Change the layout in one place.
  *
  *   <root>/openbot.json          project manifest (hand-editable)
  *   <root>/main/                 shared workspace
- *   <root>/memory/               notes agents write for each other
+ *   <root>/inbox/                files the person dropped in
+ *   <root>/memory/               team notes, plus handbook.md loaded into briefs
+ *   <root>/tools/                team tools: TOOL.md plus optional scripts
  *   <root>/agents/<slug>/        one folder per agent
  *   <root>/.openbot/             runtime state (not hand-edited)
  */
@@ -50,8 +52,33 @@ export class ProjectPaths {
   agentWorkspace(slug: string): string {
     return path.join(this.agentDir(slug), 'workspace');
   }
+  get inboxDir(): string {
+    return path.join(this.root, INBOX_DIR);
+  }
   get memoryDir(): string {
     return path.join(this.root, 'memory');
+  }
+  /**
+   * Team tools: one folder per tool, shared with every bot. Not listed in
+   * `workspaces`; the runtime always mounts it.
+   */
+  get toolsDir(): string {
+    return path.join(this.root, 'tools');
+  }
+  /** The team's shared notes. The store, not the copy. */
+  get notesDb(): string {
+    return path.join(this.memoryDir, 'notes.db');
+  }
+  /** Readable copy of every note, regenerated on every write. */
+  get notesFile(): string {
+    return path.join(this.memoryDir, 'notes.md');
+  }
+  /**
+   * The team's standing handbook. Written by setup_team, loaded into every
+   * bot's AGENTS.md. Not the notes; this is how the team works.
+   */
+  get handbookFile(): string {
+    return path.join(this.memoryDir, 'handbook.md');
   }
   /** Resolves a project-relative workspace name, refusing to escape the root. */
   workspace(name: string): string {
