@@ -9,8 +9,14 @@ git and the whole team moves with it.
 my-team/
 ├── openbot.json              the manifest, the source of truth
 ├── main/                     shared workspace any bot can be given access to
-├── memory/                   team notes, written by bots via `remember`
-│   └── brand-voice.md
+├── inbox/                    files dropped into a chat; bots copy, not move
+├── memory/                   the team's shared notes
+│   ├── notes.db              the store: dated, tagged, searchable
+│   ├── notes.md              readable copy, regenerated on every write
+│   └── handbook.md           standing brief, loaded into every bot's AGENTS.md
+├── tools/                    team tools, shared with every bot
+│   └── create-a-tool/
+│       └── TOOL.md           how this team writes a new tool
 ├── agents/
 │   └── chief-of-staff/
 │       ├── agent.json        this bot's definition
@@ -71,7 +77,8 @@ here, and two bots being edited at once cannot clobber each other.
   "createdBy": "user",
   "createdAt": "2026-08-24T12:00:00.000Z",
   "updatedAt": "2026-08-24T12:00:00.000Z",
-  "archived": false
+  "archived": false,
+  "pinned": false
 }
 ```
 
@@ -82,10 +89,12 @@ Notes:
 - **`avatar.seed`** feeds `react-nice-avatar`, which derives a face
   deterministically. The picture is not stored, only the seed. `config` is
   written only if someone customises the face by hand.
-- **`skills`** is an allow-list. `["*"]` means every registered skill.
+- **`skills`** is an allow-list of tool ids. `["*"]` means every registered
+  tool, builtin and this team's.
 - **`createdBy`** is `user` or the id of the bot that hired this one.
 - **`archived`** hides a bot without deleting its folder or history. OpenBot
   never deletes work.
+- **`pinned`** keeps them at the top of the list. Setty pins the manager.
 
 ## AGENTS.md
 
@@ -96,6 +105,58 @@ overwritten.
 
 The brief is also sent inline on the first turn of a new thread, so behaviour
 never depends on file discovery working.
+
+## Inbox
+
+Files dropped onto a chat land in `inbox/` under their original name
+(`logo.png`, then `logo-2.png` if that name is taken). The folder is always
+mounted for every bot, like `tools/`. It is not listed in `workspaces`.
+
+The original stays. A bot copies it into a working folder rather than moving
+it, so the chat preview still opens.
+
+Images are also handed to the model as pictures on that turn. Everything else
+is a path the bot can open: a PDF, a spreadsheet, a document, or any other file.
+
+Adding a new file type is a row in `FILE_KINDS`
+(`packages/shared/src/models/file.ts`). A custom preview in the app is
+optional; without one it still shows as a named chip.
+
+## Team notes
+
+`memory/notes.db` is a small SQLite database, one row per note:
+
+| Column          | What it is                                             |
+| --------------- | ------------------------------------------------------ |
+| `id`            | Small integer. What a bot quotes to fetch the body     |
+| `created_at`    | ISO timestamp                                          |
+| `summary`       | One sentence. What `recall` hands back                 |
+| `body`          | The long version, when the sentence left something out |
+| `tags`          | `,brand,voice,` so an exact tag filter is one `like`   |
+| `author`        | The bot that asked for it to be kept                   |
+| `superseded_by` | Set when a later note replaced this one. Never deleted |
+
+An FTS5 index over summary, body, and tags does the searching, weighted so a
+hit in the summary beats a hit in the body.
+
+Bots reach it through three tools and never touch the file: `remember`,
+`recall`, `read_notes`. See [docs/05-skills.md](05-skills.md).
+
+`notes.md` is regenerated from the database on every write. It exists so the
+folder stays readable and diffable; editing it changes nothing.
+
+## Team tools
+
+`tools/<name>/TOOL.md` is a tool this team added. Optional `scripts/` next to
+it. See [05-skills.md](05-skills.md#team-tools). The folder is always mounted
+for every bot; it is not listed in `workspaces`.
+
+Notes written by an older OpenBot as loose `memory/*.md` files are imported on
+first open and moved into `memory/imported/`.
+
+SQLite's `notes.db-wal` and `notes.db-shm` are scratch files and are in the
+project's `.gitignore`. `notes.db` itself is meant to be committed. A project
+created before this layout will not have those two lines; add them.
 
 ## Message log
 

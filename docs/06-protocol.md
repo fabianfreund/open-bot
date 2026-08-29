@@ -26,20 +26,27 @@ that carries an `Authorization` header.
 | `GET`    | `/api/health`                     | Liveness and project name. No auth.       |
 | `GET`    | `/api/project`                    | The manifest and its absolute root        |
 | `GET`    | `/api/providers`                  | Registered providers and their health     |
-| `GET`    | `/api/skills`                     | Every registered skill                    |
+| `GET`    | `/api/skills`                     | Every registered tool                     |
 | `GET`    | `/api/agents`                     | Agents with live status and last message  |
 | `POST`   | `/api/agents`                     | Hire a bot → `{ agent, conversationId }`  |
 | `PATCH`  | `/api/agents/:id`                 | Update a bot                              |
 | `DELETE` | `/api/agents/:id`                 | Archive a bot (never deletes work)        |
-| `GET`    | `/api/agents/:id/skills`          | The skills that bot may use               |
+| `GET`    | `/api/agents/:id/skills`          | The tools that bot may use                |
 | `GET`    | `/api/agents/:id/conversation`    | The user's chat with that bot             |
 | `GET`    | `/api/conversations`              | All conversations                         |
 | `GET`    | `/api/conversations/:id/messages` | Full history, oldest first                |
 | `POST`   | `/api/conversations/:id/messages` | Send a message; starts a turn             |
+| `POST`   | `/api/files`                      | Save a dropped file into `inbox/`         |
+| `GET`    | `/api/files?path=`                | Bytes of a project file, for previews     |
 | `POST`   | `/api/conversations/:id/answer`   | Answer an inline card                     |
 | `POST`   | `/api/conversations/:id/read`     | Clear the unread count for that chat      |
 | `POST`   | `/api/conversations/:id/abort`    | Stop the running turn                     |
-| `POST`   | `/api/skills/:id/invoke`          | Run a skill as a bot (used by the bridge) |
+| `POST`   | `/api/skills/:id/invoke`          | Run a tool as a bot (used by the bridge)  |
+
+`POST /api/files` is multipart, field `file`. The response is an `Attachment`
+(`name`, `path`, `mime`, `size`, `kind`). `POST /api/conversations/:id/messages`
+takes `{ text, attachments }`, where `attachments` is an array of those paths,
+and either text or at least one file is enough.
 
 Request and response shapes are the zod schemas in `@openbot/shared`, so the
 client and server cannot drift.
@@ -62,7 +69,8 @@ type ServerEvent =
   | { type: 'conversation.updated'; conversation: Conversation }
   | { type: 'message.created'; message: Message }
   | { type: 'message.updated'; message: Message }
-  | { type: 'notice'; level: 'info' | 'warn' | 'error'; text: string };
+  | { type: 'notice'; level: 'info' | 'warn' | 'error'; text: string }
+  | { type: 'skills.updated'; skills: SkillInfo[] };
 ```
 
 One union on one socket. A new feature adds a member here, not a new endpoint

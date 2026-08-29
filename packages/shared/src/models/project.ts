@@ -43,6 +43,8 @@ export const ProjectFileSchema = z.object({
   version: z.number().default(PROJECT_FILE_VERSION),
   id: z.string(),
   name: z.string(),
+  /** What the team is here to do. Part of every bot's standing brief. */
+  goal: z.string().default(''),
   createdAt: z.string(),
   settings: ProjectSettingsSchema.prefault({}),
   defaults: ProjectDefaultsSchema.prefault({}),

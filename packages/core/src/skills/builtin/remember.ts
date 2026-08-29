@@ -1,26 +1,33 @@
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import { z } from 'zod';
-import { slugify } from '@openbot/shared';
 import { ok, type Skill } from '../skill.js';
 
 const Input = z.object({
-  title: z.string().min(1).describe('Short title, e.g. "Brand voice".'),
-  note: z.string().min(1).describe('What the team should remember. Markdown is fine.'),
+  note: z
+    .string()
+    .min(1)
+    .describe(
+      'What the team should keep, in plain sentences. Say the thing itself, not that you are noting it. It is shortened and tagged for you.',
+    ),
 });
 
 export const rememberSkill: Skill<z.infer<typeof Input>> = {
   id: 'remember',
   title: 'Write a team note',
   description:
-    'Save something the whole team should know. Notes live in memory/ and every bot can read them.',
+    'Keep something for the whole team: a decision and why, a fact about the client or the work, a rule you have to work within, or something that went wrong. Not progress, not what you are about to do. It is filed against every note already on record, so you are told if it is new, if it corrected an older note, or if it was already covered.',
   input: Input,
   async run(input, ctx) {
-    const dir = path.join(ctx.host.projectRoot, 'memory');
-    await fs.mkdir(dir, { recursive: true });
-    const file = path.join(dir, `${slugify(input.title)}.md`);
-    const body = `# ${input.title}\n\n${input.note.trim()}\n\n_${ctx.agent.name}, ${new Date().toISOString().slice(0, 10)}_\n`;
-    await fs.writeFile(file, body, 'utf8');
-    return ok(`Saved to memory/${path.basename(file)}.`);
+    const outcome = await ctx.host.rememberNote({ agentId: ctx.agent.id, text: input.note });
+
+    if (outcome.action === 'skipped') {
+      return ok(`Not kept. ${outcome.reason} Nothing to do; carry on.`, outcome);
+    }
+    if (outcome.action === 'updated') {
+      return ok(
+        `Note ${outcome.replaced} was out of date, so it now reads: "${outcome.note.summary}" (note ${outcome.note.id}).`,
+        outcome,
+      );
+    }
+    return ok(`Kept as note ${outcome.note.id}: "${outcome.note.summary}".`, outcome);
   },
 };

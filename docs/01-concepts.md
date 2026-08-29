@@ -6,8 +6,8 @@ two things, split it into two words rather than overloading it.
 ## Team
 
 Everything that lives in one project folder: the bots, their work, their chat
-history, and the settings. One folder, one team. Move the folder and the whole
-team moves with it.
+history, the files you drop in, and the settings. One folder, one team. Move
+the folder and the whole team moves with it.
 
 ## Project
 
@@ -28,7 +28,7 @@ A bot has:
 - a **brief** (`instructions`), its standing orders
 - a **workspace**, `agents/<slug>/workspace/`, its own folder
 - a **provider**, which model backend runs its turns
-- **skills**, which capabilities it may use
+- **tools**, which capabilities it may use
 
 ## Conversation
 
@@ -52,21 +52,26 @@ two messages to the same bot queue rather than collide.
 A model backend. Codex ships with OpenBot and runs on your ChatGPT
 subscription. Providers are pluggable; see [04-providers.md](04-providers.md).
 
-## Skill
+## Tool
 
 Something a bot can do beyond talking: hire a colleague, pass work along, ask
-you a question, write a team note. Skills are pluggable; see
-[05-skills.md](05-skills.md).
+you a question, write a team note, run a playbook this team wrote. Tools are
+pluggable; see [05-skills.md](05-skills.md).
 
 Reading files, writing files, searching, and running commands are **not**
-skills. Codex already provides those. OpenBot's skills are the ones that make
-a collection of bots into a team.
+OpenBot tools. Codex already provides those. OpenBot's tools are the ones that
+make a collection of bots into a team, plus whatever that team has added under
+`tools/`.
+
+On disk a bot's allow-list is still the `skills` field in `agent.json`. That
+is the list of tool ids it may use.
 
 ## Card
 
-An interactive block rendered inline in the chat. Today that means a question
-with tappable answers. Cards exist so a bot can ask for something without making
-you write a sentence. See [05-skills.md](05-skills.md#cards).
+An interactive block rendered inline in the chat. A question with tappable
+answers, or a button that opens a file, folder, or page. Cards exist so a bot
+can ask for something without making you write a sentence. See
+[05-skills.md](05-skills.md#cards).
 
 ## Host and client
 

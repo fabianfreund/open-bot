@@ -20,24 +20,51 @@ export const CardSchema = z.object({
 });
 export type Card = z.infer<typeof CardSchema>;
 
-/** Props for the built-in `question` card. */
-export interface QuestionCardProps {
+/** One question inside a `question` card. */
+export interface QuestionItem {
   question: string;
   /** Suggested answers. Empty means free text only. */
   options: string[];
   /** Whether the person may type something other than the options. */
   allowFreeText: boolean;
-  /** Optional label above the options, e.g. "Pick one". */
+  /** They can pick more than one option, then send. Default true. */
+  allowMultiple?: boolean;
+}
+
+/** Props for the built-in `question` card. One question or several. */
+export interface QuestionCardProps {
+  /** Single-question form, still understood. Prefer `questions`. */
+  question?: string;
+  options?: string[];
+  allowFreeText?: boolean;
+  allowMultiple?: boolean;
   hint?: string;
+  questions?: QuestionItem[];
 }
 
 export function questionCard(id: string, props: QuestionCardProps): Card {
+  const questions = normalizeQuestions(props);
   return {
     id,
     type: 'question',
-    props: { ...props },
+    props: questions.length === 1 && props.question ? { ...props } : { questions },
     answered: false,
   };
+}
+
+export function normalizeQuestions(props: QuestionCardProps): QuestionItem[] {
+  if (props.questions && props.questions.length > 0) return props.questions;
+  if (props.question) {
+    return [
+      {
+        question: props.question,
+        options: props.options ?? [],
+        allowFreeText: props.allowFreeText ?? true,
+        allowMultiple: props.allowMultiple,
+      },
+    ];
+  }
+  return [];
 }
 
 /** One thing a person can open from the chat. */

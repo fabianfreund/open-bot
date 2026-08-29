@@ -26,6 +26,10 @@ function createWindow(): BrowserWindow {
     void shell.openExternal(url);
     return { action: 'deny' };
   });
+  // Dropping a file onto the window must not navigate away from the app.
+  window.webContents.on('will-navigate', (event, url) => {
+    if (url !== window.webContents.getURL()) event.preventDefault();
+  });
 
   const devUrl = process.env.ELECTRON_RENDERER_URL;
   if (devUrl) void window.loadURL(devUrl);
@@ -52,6 +56,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', () => {
-  void host.stop();
+let quitting = false;
+app.on('before-quit', (event) => {
+  if (quitting) return;
+  event.preventDefault();
+  quitting = true;
+  void host.stop().finally(() => app.quit());
 });

@@ -19,15 +19,29 @@ export async function authedFetch(request: AuthedRequest): Promise<Response> {
     method,
     headers: {
       authorization: `Bearer ${token}`,
-      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      ...bodyHeaders(body),
     },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    ...(body === undefined ? {} : { body: encodeBody(body) }),
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
     throw new HttpError(res.status, detail);
   }
   return res;
+}
+
+function isForm(body: unknown): body is FormData {
+  return typeof FormData !== 'undefined' && body instanceof FormData;
+}
+
+function bodyHeaders(body: unknown): Record<string, string> {
+  if (body === undefined || isForm(body)) return {};
+  return { 'content-type': 'application/json' };
+}
+
+function encodeBody(body: unknown): string | FormData {
+  if (isForm(body)) return body;
+  return JSON.stringify(body);
 }
 
 export class HttpError extends Error {

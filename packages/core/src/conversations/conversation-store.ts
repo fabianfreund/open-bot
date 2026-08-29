@@ -1,16 +1,26 @@
 import {
   ConversationSchema,
   MessageSchema,
+  USER_ID,
   agentChannelId,
   dmConversationId,
+  messageText,
   newId,
   type Conversation,
   type Message,
 } from '@openbot/shared';
+import type { z } from 'zod';
+
+type NewMessage = Omit<z.input<typeof MessageSchema>, 'id' | 'createdAt'> & {
+  id?: string;
+  createdAt?: string;
+};
 import type { ProjectStore } from '../project/project-store.js';
 import { appendJsonl, readJson, readJsonl, rewriteJsonl, writeJson } from '../storage/json-file.js';
 
 const MAX_PREVIEW = 140;
+/** Live chats stay in memory; older ones drop out so look_back cannot pin everything. */
+const MAX_CACHED_CHATS = 40;
 
 /**
  * Conversations live in one small JSON file; messages append to a JSONL file
@@ -86,26 +96,34 @@ export class ConversationStore {
 
   async messages(conversationId: string): Promise<Message[]> {
     const cached = this.#cache.get(conversationId);
-    if (cached) return cached;
-    const rows = await readJsonl<unknown>(this.project.paths.messagesFile(conversationId));
-    const parsed: Message[] = [];
-    for (const row of rows) {
-      const result = MessageSchema.safeParse(row);
-      if (result.success) parsed.push(result.data);
+    if (cached) {
+      this.#cache.delete(conversationId);
+      this.#cache.set(conversationId, cached);
+      return cached;
     }
-    this.#cache.set(conversationId, parsed);
+    const parsed = await this.#readMessages(conversationId);
+    this.#remember(conversationId, parsed);
     return parsed;
   }
 
+  /**
+   * For searches: use the live cache if this chat is already open, otherwise
+   * read from disk without pinning the whole history.
+   */
+  async peekMessages(conversationId: string): Promise<Message[]> {
+    const cached = this.#cache.get(conversationId);
+    if (cached) return cached;
+    return this.#readMessages(conversationId);
+  }
+
   /** Appends a message and refreshes the conversation's preview line. */
-  async append(
-    input: Omit<Message, 'id' | 'createdAt'> & Partial<Pick<Message, 'id' | 'createdAt'>>,
-  ): Promise<Message> {
+  async append(input: NewMessage): Promise<Message> {
     const message = MessageSchema.parse({
       id: input.id ?? newId('msg'),
       createdAt: input.createdAt ?? new Date().toISOString(),
       ...input,
     });
+    this.#assertSpeaker(message);
     const list = await this.messages(message.conversationId);
     list.push(message);
     await appendJsonl(this.project.paths.messagesFile(message.conversationId), message);
@@ -118,6 +136,7 @@ export class ConversationStore {
    * completion; only the finalise call rewrites the file.
    */
   async replace(message: Message, persist: boolean): Promise<Message> {
+    this.#assertSpeaker(message);
     const list = await this.messages(message.conversationId);
     const index = list.findIndex((m) => m.id === message.id);
     if (index >= 0) list[index] = message;
@@ -151,12 +170,46 @@ export class ConversationStore {
     const conversation = this.#conversations.get(message.conversationId);
     if (!conversation) return;
     conversation.lastMessageAt = message.createdAt;
-    conversation.lastMessagePreview = preview(message.body);
+    conversation.lastMessagePreview = preview(messageText(message));
     await this.#persistConversations();
+  }
+
+  /** A DM only ever contains the person and that one bot. */
+  #assertSpeaker(message: Message): void {
+    const conversation = this.#conversations.get(message.conversationId);
+    if (!conversation) throw new Error(`No conversation ${message.conversationId}`);
+    if (conversation.kind === 'dm') {
+      if (message.author.kind === 'user' && message.author.id === USER_ID) return;
+      if (message.author.kind === 'agent' && message.author.id === conversation.agentId) return;
+      throw new Error('A bot cannot write in another bot’s chat.');
+    }
+    if (message.author.kind === 'agent' && conversation.participants.includes(message.author.id)) {
+      return;
+    }
+    throw new Error('A bot cannot write in another bot’s chat.');
   }
 
   async #persistConversations(): Promise<void> {
     await writeJson(this.project.paths.conversationsFile, [...this.#conversations.values()]);
+  }
+
+  async #readMessages(conversationId: string): Promise<Message[]> {
+    const rows = await readJsonl<unknown>(this.project.paths.messagesFile(conversationId));
+    const parsed: Message[] = [];
+    for (const row of rows) {
+      const result = MessageSchema.safeParse(row);
+      if (result.success) parsed.push(result.data);
+    }
+    return parsed;
+  }
+
+  #remember(conversationId: string, messages: Message[]): void {
+    this.#cache.set(conversationId, messages);
+    while (this.#cache.size > MAX_CACHED_CHATS) {
+      const oldest = this.#cache.keys().next().value;
+      if (!oldest || oldest === conversationId) break;
+      this.#cache.delete(oldest);
+    }
   }
 }
 

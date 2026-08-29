@@ -13,6 +13,7 @@
   },
   "scripts": {
     "build": "tsc --build",
+    "test": "tsc --build && node --test dist/turns/scheduler.test.js dist/turns/flow.test.js dist/memory/notes.test.js dist/memory/librarian.test.js dist/skills/team.test.js dist/skills/onboarding.test.js dist/files/files.test.js",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {

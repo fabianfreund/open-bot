@@ -16,6 +16,7 @@
     "dev:packages": "tsc --build --watch packages/shared packages/core packages/client packages/server packages/skills-mcp",
     "serve": "pnpm run build && node packages/server/dist/bin.js",
     "typecheck": "tsc --build packages/shared packages/core packages/client packages/server packages/skills-mcp && pnpm --filter @openbot/desktop run typecheck",
+    "test": "pnpm --filter @openbot/core test",
     "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo apps/desktop/out node_modules/.tmp",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
   },

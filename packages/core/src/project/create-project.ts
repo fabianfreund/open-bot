@@ -7,6 +7,7 @@ import {
   newId,
   type ProjectFile,
 } from '@openbot/shared';
+import { ensureTeamTools } from '../skills/team/handbook.js';
 import { ProjectPaths } from '../storage/paths.js';
 import { writeJson } from '../storage/json-file.js';
 
@@ -26,10 +27,18 @@ export async function createProject(options: CreateProjectOptions): Promise<Proj
   const name = options.name?.trim() || path.basename(paths.root);
 
   await assertUsable(paths.root);
-  for (const dir of [paths.root, paths.agentsDir, paths.memoryDir, paths.runtimeDir]) {
+  for (const dir of [
+    paths.root,
+    paths.agentsDir,
+    paths.memoryDir,
+    paths.toolsDir,
+    paths.inboxDir,
+    paths.runtimeDir,
+  ]) {
     await fs.mkdir(dir, { recursive: true });
   }
   await fs.mkdir(paths.workspace('main'), { recursive: true });
+  await ensureTeamTools(paths.toolsDir);
 
   const file = ProjectFileSchema.parse({
     version: PROJECT_FILE_VERSION,
@@ -42,7 +51,6 @@ export async function createProject(options: CreateProjectOptions): Promise<Proj
   });
 
   await writeJson(paths.projectFile, file);
-  await fs.writeFile(path.join(paths.memoryDir, 'README.md'), MEMORY_README, 'utf8');
   await fs.writeFile(path.join(paths.root, '.gitignore'), PROJECT_GITIGNORE, 'utf8');
   return file;
 }
@@ -64,11 +72,10 @@ async function assertUsable(root: string): Promise<void> {
   }
 }
 
-const MEMORY_README = `# Memory
-
-Shared notes. Any agent can read these; agents write here with the \`remember\` skill.
-`;
-
+// The notes themselves are meant to be committed; SQLite's sidecar files are
+// scratch space and change on every read.
 const PROJECT_GITIGNORE = `.openbot/
 .DS_Store
+memory/notes.db-wal
+memory/notes.db-shm
 `;

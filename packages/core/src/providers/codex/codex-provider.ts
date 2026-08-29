@@ -64,14 +64,21 @@ export class CodexProvider implements Provider {
 
   constructor(private readonly options: CodexProviderOptions = {}) {}
 
+  #sessions = new Map<string, Codex>();
+
   async run(input: ProviderRunInput, context: ProviderContext): Promise<ProviderRunResult> {
     const codexPath = await locateCodex(this.options.codexPath);
     if (!codexPath) throw new Error(CODEX_MISSING);
 
-    const codex = new Codex({
-      codexPathOverride: codexPath,
-      config: this.#buildConfig(context),
-    });
+    const key = sessionKey(context);
+    let codex = this.#sessions.get(key);
+    if (!codex) {
+      codex = new Codex({
+        codexPathOverride: codexPath,
+        config: this.#buildConfig(context),
+      });
+      this.#sessions.set(key, codex);
+    }
 
     const threadOptions = this.#buildThreadOptions(context);
     const isNewThread = !context.providerThreadId;
@@ -155,6 +162,33 @@ export class CodexProvider implements Provider {
     }
   }
 
+  mapError(err: unknown): string {
+    const raw = err instanceof Error ? err.message : String(err);
+    if (/not logged in|unauthor|401/i.test(raw))
+      return 'Not signed in to Codex. Run `codex login`.';
+    if (/Codex is not installed/i.test(raw)) return raw;
+    if (/Unable to locate Codex CLI/i.test(raw)) {
+      return 'Codex is not installed on this computer. Install it, then run `codex login`.';
+    }
+    if (/ENOENT|not found/i.test(raw) && /codex/i.test(raw)) {
+      return 'Codex is not installed on this computer.';
+    }
+    if (/rate limit|429/i.test(raw)) return 'Hit a rate limit. Try again shortly.';
+    if (/usage limit|quota/i.test(raw)) return 'Your Codex usage limit is reached.';
+    return raw.split('\n')[0]?.slice(0, 300) ?? 'Something went wrong.';
+  }
+
+  release(agentId?: string, conversationId?: string): void {
+    if (!agentId) {
+      this.#sessions.clear();
+      return;
+    }
+    const prefix = conversationId ? `${agentId}\0${conversationId}\0` : `${agentId}\0`;
+    for (const key of this.#sessions.keys()) {
+      if (key.startsWith(prefix)) this.#sessions.delete(key);
+    }
+  }
+
   /**
    * Registers OpenBot's skill bridge as an MCP server for this run. Codex
    * spawns it over stdio and it calls straight back into the running server.
@@ -220,8 +254,6 @@ function mapEvent(event: ThreadEvent, messages: Map<string, string>): ProviderSt
       ];
     case 'error':
       return [{ kind: 'error', message: event.message }];
-    case 'turn.failed':
-      return [{ kind: 'error', message: event.error.message }];
     case 'item.started':
     case 'item.updated':
     case 'item.completed':
@@ -330,4 +362,15 @@ function mapItem(
 function firstLine(text: string): string {
   const line = text.split('\n').find((l) => l.trim().length > 0) ?? 'Thinking';
   return line.replace(/^[#*\s]+/, '').slice(0, 120);
+}
+
+function sessionKey(context: ProviderContext): string {
+  const { skillBridge, agent, conversation, skills } = context;
+  return [
+    agent.id,
+    conversation.id,
+    skillBridge.serverUrl,
+    skillBridge.token,
+    skills.map((s) => s.id).join(','),
+  ].join('\0');
 }

@@ -49,6 +49,8 @@ export const AgentDefinitionSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   archived: z.boolean().default(false),
+  /** Pinned bots sit at the top of the list. */
+  pinned: z.boolean().default(false),
 });
 export type AgentDefinition = z.infer<typeof AgentDefinitionSchema>;
 

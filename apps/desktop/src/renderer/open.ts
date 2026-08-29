@@ -1,3 +1,11 @@
+/** Joins a project-relative path onto the host's project root. */
+export function hostPath(root: string, rel: string): string {
+  const sep = root.includes('\\') ? '\\' : '/';
+  const base = root.replace(/[\\/]+$/, '');
+  const rest = rel.replace(/\\/g, '/').split('/').filter(Boolean).join(sep);
+  return rest ? `${base}${sep}${rest}` : base;
+}
+
 /** Web addresses go to the browser; everything else is a path on this computer. */
 const WEB = /^(https?|mailto):/i;
 

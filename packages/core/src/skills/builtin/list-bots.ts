@@ -11,7 +11,7 @@ export const listBotsSkill: Skill<z.infer<typeof Input>> = {
   input: Input,
   async run(_input, ctx) {
     const others = ctx.host.listAgents().filter((a) => a.id !== ctx.agent.id);
-    const available = `Skills you can hand out: ${ctx.host
+    const available = `Tools you can hand out: ${ctx.host
       .listSkills()
       .map((s) => s.id)
       .join(', ')}.`;
@@ -24,7 +24,8 @@ export const listBotsSkill: Skill<z.infer<typeof Input>> = {
 
     const lines = others.map((a) => {
       const limited = a.skills.includes('*') ? '' : ` (limited to: ${a.skills.join(', ')})`;
-      return `- ${a.name}${a.role ? `, ${a.role}` : ''}${limited}`;
+      const pin = a.pinned ? ' (pinned)' : '';
+      return `- ${a.name}${a.role ? `, ${a.role}` : ''}${pin}${limited}`;
     });
     return ok(
       ['Your colleagues:', ...lines, '', available].join('\n'),

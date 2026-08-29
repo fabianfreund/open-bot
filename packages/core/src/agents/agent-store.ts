@@ -5,10 +5,12 @@ import {
   slugify,
   type AgentDefinition,
   type CreateAgentRequest,
+  type SkillInfo,
   type UpdateAgentRequest,
 } from '@openbot/shared';
 import type { ProjectStore } from '../project/project-store.js';
 import { readJson, writeJson } from '../storage/json-file.js';
+import { readHandbook } from '../project/setup.js';
 import { renderInstructions } from './instructions.js';
 
 /**
@@ -17,8 +19,14 @@ import { renderInstructions } from './instructions.js';
  */
 export class AgentStore {
   #agents = new Map<string, AgentDefinition>();
+  #skills: SkillInfo[] = [];
 
   constructor(private readonly project: ProjectStore) {}
+
+  /** So briefs mention every tool that currently exists. */
+  useSkills(skills: SkillInfo[]): void {
+    this.#skills = skills;
+  }
 
   async load(): Promise<void> {
     this.#agents.clear();
@@ -28,8 +36,10 @@ export class AgentStore {
       const parsed = AgentDefinitionSchema.safeParse(raw);
       if (parsed.success) this.#agents.set(parsed.data.id, parsed.data);
     }
-    // The brief is generated, so a bot hired before a skill existed would go on
-    // reading a brief that never mentions it. Rewrite them all on the way in.
+  }
+
+  /** Regenerates every live brief. Used when something team-wide changes. */
+  async rewriteInstructions(): Promise<void> {
     for (const agent of this.#agents.values()) {
       if (!agent.archived) await this.#writeInstructions(agent);
     }
@@ -81,6 +91,7 @@ export class AgentStore {
       createdBy: request.createdBy ?? 'user',
       createdAt: now,
       updatedAt: now,
+      pinned: request.pinned ?? false,
     });
 
     await fs.mkdir(this.project.paths.agentWorkspace(slug), { recursive: true });
@@ -114,6 +125,7 @@ export class AgentStore {
       },
       skills: patch.skills ?? current.skills,
       archived: patch.archived ?? current.archived,
+      pinned: patch.pinned ?? current.pinned,
       updatedAt: new Date().toISOString(),
     });
 
@@ -134,11 +146,15 @@ export class AgentStore {
 
   /** `agents/<slug>/workspace/AGENTS.md`, the brief the provider reads. */
   async #writeInstructions(definition: AgentDefinition): Promise<void> {
-    await fs.writeFile(
-      this.project.paths.agentInstructionsFile(definition.slug),
-      renderInstructions(definition, this.project.file),
-      'utf8',
-    );
+    const handbook = await readHandbook(this.project.paths);
+    const text = renderInstructions(definition, this.project.file, this.#skills, handbook);
+    const file = this.project.paths.agentInstructionsFile(definition.slug);
+    try {
+      if ((await fs.readFile(file, 'utf8')) === text) return;
+    } catch {
+      // Missing or unreadable; write a fresh copy.
+    }
+    await fs.writeFile(file, text, 'utf8');
   }
 
   #uniqueSlug(base: string): string {

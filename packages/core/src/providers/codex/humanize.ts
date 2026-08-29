@@ -60,7 +60,15 @@ export function describeSkillCall(tool: string, args: unknown): string {
     case 'ask_user':
       return 'Asked you a question';
     case 'remember':
-      return typeof a.title === 'string' ? `Noted "${a.title}"` : 'Wrote a note for the team';
+      return 'Wrote a note for the team';
+    case 'recall':
+      return typeof a.about === 'string' && a.about.trim()
+        ? `Checked the team notes for "${a.about.trim()}"`
+        : 'Checked the team notes';
+    case 'read_notes': {
+      const count = Array.isArray(a.ids) ? a.ids.length : 1;
+      return count > 1 ? `Read ${count} team notes` : 'Read a team note';
+    }
     default:
       return `Used ${tool.replace(/_/g, ' ')}`;
   }

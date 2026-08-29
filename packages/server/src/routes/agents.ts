@@ -44,6 +44,7 @@ export async function agentRoutes(app: FastifyInstance, runtime: OpenBotRuntime)
   app.get<{ Params: { id: string } }>('/api/agents/:id/skills', async (request, reply) => {
     const agent = runtime.getAgent(request.params.id);
     if (!agent) return reply.code(404).send({ error: 'not_found' });
+    await runtime.reloadTools();
     return runtime.skills.forAgent(agent);
   });
 }
